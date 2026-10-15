@@ -4,6 +4,7 @@ from PIL import Image
 from segmentation_lab.algorithms import kmeans_segment, otsu_threshold
 from segmentation_lab.metrics import binary_metrics, confusion_matrix
 from scripts.build_real_masks import rasterize, write_gray_png
+from scripts.export_labelme_masks import export_one
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -66,3 +67,16 @@ def test_real_masks_regenerate_byte_for_byte(tmp_path):
         write_gray_png(output, generated)
         tracked = ROOT / "data/real/masks" / output.name
         assert output.read_bytes() == tracked.read_bytes(), image_name
+
+
+def test_labelme_exporter_converts_only_target_polygons(tmp_path):
+    annotation = tmp_path / "01_calle_mural.json"
+    annotation.write_text(__import__("json").dumps({"shapes": [
+        {"label": "urban_built_surface", "shape_type": "polygon", "points": [[0, 0], [100, 0], [100, 100]]},
+        {"label": "person", "shape_type": "polygon", "points": [[0, 0], [10, 0], [10, 10]]},
+    ]}), encoding="utf-8")
+    output = tmp_path / "mask.png"
+    export_one(annotation, ROOT / "data/real/images/01_calle_mural.jpg", output)
+    values = set(np.asarray(Image.open(output).convert("L")).ravel())
+    assert values.issubset({0, 255})
+    assert 255 in values

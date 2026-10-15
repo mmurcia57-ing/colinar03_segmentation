@@ -12,6 +12,8 @@ Implementación reproducible de segmentación binaria mediante **Otsu** y **K-me
 - `data/real/annotations.json`: polígonos manuales, independientes de Otsu/K-means.
 - `data/real/README.md`: definición de la clase `urban_built_surface`, atribución y límites de las anotaciones.
 - `scripts/build_real_masks.py`: rasterización manual determinista y escritura PNG canónica.
+- `scripts/export_labelme_masks.py`: conversión determinista de anotaciones LabelMe revisadas; no aprueba ground truth.
+- `docs/qg0_assisted_ground_truth.md`: decisión de viabilidad y estado QG0/QG1.
 - `notebooks/evaluacion_segmentacion.ipynb`: notebook reproducible con originales, ground truth, resultados y mapas de errores.
 - `tests/test_segmentation.py`: pruebas unitarias.
 
