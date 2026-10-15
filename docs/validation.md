@@ -10,26 +10,27 @@ Fecha de preparación: 2026-10-15 (America/Bogota).
 - Dataset real presente en `data/real/images/` con cinco fotografías y fuentes/licencias en `data/real/sources.json`.
 - Ground truth independiente definido en `data/real/annotations.json` y rasterizado por `scripts/build_real_masks.py`.
 - Notebook válido como JSON y con seis celdas: `notebooks/evaluacion_segmentacion.ipynb`.
-- `git diff --check` debe ejecutarse en VS Code después de clonar la rama.
+- Las pruebas comprueban que las máscaras no sean vacías ni de cobertura total, que las cinco fuentes tengan autor/licencia/página verificable y que la regeneración produzca los mismos bytes PNG.
 
 ## Evidencia ejecutada
 
 - `python scripts/build_real_masks.py`: creó 5 máscaras PNG a partir de `annotations.json`.
-- `python -m pytest -q`: `4 passed`.
-- `jupyter nbconvert --execute --to notebook --inplace notebooks/evaluacion_segmentacion.ipynb --ExecutePreprocessor.kernel_name=python3`: completó 4 celdas de código y dejó 12 salidas persistidas.
+- `python -m pytest -q` con carpeta temporal dentro del workspace: `7 passed`.
+- `python -m jupyter nbconvert --execute --to notebook --inplace notebooks/evaluacion_segmentacion.ipynb --ExecutePreprocessor.kernel_name=python3 --ExecutePreprocessor.timeout=180`: completó 4 celdas de código; el notebook quedó con 12 salidas persistidas.
 - El notebook imprimió resultados para las 5 imágenes, con IoU/Dice/precisión/recall y matrices `[[TN, FP], [FN, TP]]` para ambos métodos.
 
-Promedios calculados desde las salidas ejecutadas: Otsu IoU `0.342545`, Dice `0.500933`, precisión `0.753879`, recall `0.395598`; K-means IoU `0.341752`, Dice `0.500237`, precisión `0.754377`, recall `0.395024`. Estos valores describen esta anotación manual y no constituyen una afirmación de superioridad general.
+Promedios calculados desde las salidas ejecutadas: Otsu IoU `0.342545`, Dice `0.500933`, precisión `0.753879`, recall `0.395598`, exactitud `0.401838`; K-means IoU `0.341752`, Dice `0.500237`, precisión `0.754377`, recall `0.395024`, exactitud `0.400755`. Estos valores describen esta anotación manual y no constituyen una afirmación de superioridad general.
 
 ## Estado de ejecución
 
-No se marca `pytest` ni la ejecución del notebook como aprobados en esta máquina: el host solo ofrece Python 3.13/3.14, no Python 3.12, y el lanzador quedó sin salida fiable durante la instalación de dependencias. Ejecutar en VS Code con Python 3.12:
+La validación de este cambio se ejecutó en el host disponible con Python 3.14; no sustituye la comprobación solicitada en Python 3.12.10. En VS Code con Python 3.12:
 
 ```powershell
 $env:PYTHONPATH = "$PWD\src"
+python scripts/build_real_masks.py
 python scripts/generate_dataset.py
 python -m pytest -q
-python -m jupyter nbconvert --execute --to notebook --inplace notebooks/evaluacion_segmentacion.ipynb
+python -m jupyter nbconvert --execute --to notebook --inplace notebooks/evaluacion_segmentacion.ipynb --ExecutePreprocessor.kernel_name=python3 --ExecutePreprocessor.timeout=180
 ```
 
-Registrar en la entrega la salida completa de esos tres comandos; solo entonces declarar la validación aprobada.
+Registrar en la entrega la salida completa de esos comandos. Si una regeneración cambia bytes, revisar primero versión del checkout y ejecutar la prueba byte a byte antes de aceptar cambios.

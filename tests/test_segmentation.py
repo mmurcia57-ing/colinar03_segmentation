@@ -3,6 +3,7 @@ from pathlib import Path
 from PIL import Image
 from segmentation_lab.algorithms import kmeans_segment, otsu_threshold
 from segmentation_lab.metrics import binary_metrics, confusion_matrix
+from scripts.build_real_masks import rasterize, write_gray_png
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -37,3 +38,31 @@ def test_real_dataset_has_five_independent_manual_mask_pairs():
             assert image.size == mask.size
             assert set(np.asarray(mask.convert("L")).ravel()).issubset({0, 255})
         assert annotation["polygons"]
+
+
+def test_real_annotations_use_one_nontrivial_target_class():
+    annotations = __import__("json").loads((ROOT / "data/real/annotations.json").read_text(encoding="utf-8"))
+    assert annotations["label"] == "urban_built_surface"
+    for image_name in annotations["images"]:
+        mask = np.asarray(Image.open(ROOT / "data/real/masks" / f"{Path(image_name).stem}_mask.png").convert("L"))
+        foreground_ratio = float((mask == 255).mean())
+        assert 0.01 < foreground_ratio < 0.99, (image_name, foreground_ratio)
+
+
+def test_real_sources_cover_all_images_with_traceable_licenses():
+    annotations = __import__("json").loads((ROOT / "data/real/annotations.json").read_text(encoding="utf-8"))
+    sources = __import__("json").loads((ROOT / "data/real/sources.json").read_text(encoding="utf-8"))
+    assert {entry["local_file"] for entry in sources["images"]} == set(annotations["images"])
+    for entry in sources["images"]:
+        assert entry["author"] and entry["license"]
+        assert entry["source_page"].startswith("https://commons.wikimedia.org/wiki/File:")
+
+
+def test_real_masks_regenerate_byte_for_byte(tmp_path):
+    annotations = __import__("json").loads((ROOT / "data/real/annotations.json").read_text(encoding="utf-8"))
+    for image_name, annotation in annotations["images"].items():
+        generated = rasterize(ROOT / "data/real/images" / image_name, annotation["polygons"])
+        output = tmp_path / f"{Path(image_name).stem}_mask.png"
+        write_gray_png(output, generated)
+        tracked = ROOT / "data/real/masks" / output.name
+        assert output.read_bytes() == tracked.read_bytes(), image_name
