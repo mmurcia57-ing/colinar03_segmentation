@@ -1,0 +1,38 @@
+{
+  "schema": "polygon-annotations-v1",
+  "label": "foreground_urbano",
+  "definition": "Estructuras, pavimento, vegetacion y peatones seleccionados como escena urbana de interes; el cielo y el fondo no anotado quedan en cero.",
+  "annotator": "manual inicial para laboratorio UNIR",
+  "coordinate_system": "vertices normalizados [x, y] en rango 0..1; cada poligono se rasteriza sobre el tamano original",
+  "images": {
+    "01_calle_mural.jpg": {
+      "notes": "Calle empedrada, fachadas, mural y peatones; se excluye el cielo central.",
+      "polygons": [[[0.00,0.18],[0.43,0.18],[0.60,0.18],[0.70,0.23],[0.86,0.20],[1.00,0.08],[1.00,1.00],[0.00,1.00]]]
+    },
+    "02_casa_cuervo.jpg": {
+      "notes": "Patio colonial, cubiertas, balcones, puertas, ventanas y jardin; toda la vista es escena de interes.",
+      "polygons": [[[0.00,0.00],[1.00,0.00],[1.00,1.00],[0.00,1.00]]]
+    },
+    "03_sombras_tarde.jpg": {
+      "notes": "Tejados, edificios, arboles y avenida urbana; no se observa cielo abierto relevante.",
+      "polygons": [[[0.00,0.00],[1.00,0.00],[1.00,1.00],[0.00,1.00]]]
+    },
+    "04_vendedor_peaton.jpg": {
+      "notes": "Objetos y personas en primer plano: puestos, carros, vendedor central y peatones laterales.",
+      "polygons": [
+        [[0.00,0.42],[0.17,0.39],[0.29,0.55],[0.28,0.92],[0.00,0.92]],
+        [[0.31,0.38],[0.48,0.28],[0.61,0.39],[0.80,0.43],[0.79,0.91],[0.31,0.91]],
+        [[0.78,0.28],[1.00,0.24],[1.00,0.78],[0.80,0.78]]
+      ]
+    },
+    "05_calle_candelaria.jpg": {
+      "notes": "Fachadas coloniales laterales, balcones, puertas, ventanas y peatones en la calle.",
+      "polygons": [
+        [[0.00,0.00],[0.43,0.00],[0.47,0.45],[0.39,0.68],[0.35,0.98],[0.00,0.98]],
+        [[0.76,0.00],[1.00,0.00],[1.00,0.98],[0.86,0.98],[0.80,0.60],[0.74,0.42]],
+        [[0.43,0.48],[0.52,0.46],[0.55,0.72],[0.49,0.83],[0.43,0.75]],
+        [[0.58,0.52],[0.65,0.49],[0.69,0.78],[0.63,0.87],[0.57,0.77]]
+      ]
+    }
+  }
+}

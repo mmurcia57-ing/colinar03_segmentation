@@ -1,6 +1,10 @@
 import numpy as np
+from pathlib import Path
+from PIL import Image
 from segmentation_lab.algorithms import kmeans_segment, otsu_threshold
 from segmentation_lab.metrics import binary_metrics, confusion_matrix
+
+ROOT = Path(__file__).resolve().parents[1]
 
 def test_otsu_separates_two_intensity_groups():
     image = np.array([[20, 20, 20, 220, 220, 220]], dtype=np.uint8)
@@ -21,3 +25,15 @@ def test_metrics_and_confusion_matrix_have_expected_values():
     metrics = binary_metrics(truth, prediction)
     assert metrics["iou"] == 1 / 3; assert metrics["dice"] == 0.5
     assert metrics["precision"] == 0.5; assert metrics["recall"] == 0.5
+
+
+def test_real_dataset_has_five_independent_manual_mask_pairs():
+    annotations = __import__("json").loads((ROOT / "data/real/annotations.json").read_text(encoding="utf-8"))
+    image_dir = ROOT / "data/real/images"
+    mask_dir = ROOT / "data/real/masks"
+    assert len(annotations["images"]) == 5
+    for image_name, annotation in annotations["images"].items():
+        with Image.open(image_dir / image_name) as image, Image.open(mask_dir / f"{Path(image_name).stem}_mask.png") as mask:
+            assert image.size == mask.size
+            assert set(np.asarray(mask.convert("L")).ravel()).issubset({0, 255})
+        assert annotation["polygons"]

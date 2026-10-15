@@ -1,13 +1,16 @@
 # Laboratorio UNIR: Evaluación de la segmentación
 
-Implementación reproducible de segmentación binaria mediante **Otsu** y **K-means**, con evaluación propia mediante IoU, Dice, precisión, recall y matriz de confusión.
+Implementación reproducible de segmentación binaria mediante **Otsu** y **K-means**, con evaluación propia mediante IoU, Dice, precisión, recall y matriz de confusión. La evidencia principal usa cinco fotografías reales de La Candelaria, Bogotá; el dataset sintético se conserva como prueba de regresión.
 
 ## Estructura
 
 - `src/segmentation_lab/algorithms.py`: Otsu y K-means implementados con NumPy.
 - `src/segmentation_lab/metrics.py`: matriz `[[TN, FP], [FN, TP]]` y métricas binarias.
 - `scripts/generate_dataset.py`: genera tres imágenes sintéticas distintas y sus máscaras ground truth.
-- `notebooks/evaluacion_segmentacion.ipynb`: notebook reproducible con visualizaciones y tabla de resultados.
+- `data/real/images/`: cinco fotografías reales reutilizables de Wikimedia Commons.
+- `data/real/annotations.json`: polígonos manuales, independientes de Otsu/K-means.
+- `scripts/build_real_masks.py`: rasteriza las máscaras desde las anotaciones manuales.
+- `notebooks/evaluacion_segmentacion.ipynb`: notebook reproducible con originales, ground truth, resultados y mapas de errores.
 - `tests/test_segmentation.py`: pruebas unitarias.
 
 ## Ejecutar en VS Code Windows / Python 3.12
@@ -19,12 +22,13 @@ py -3.12 -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install -r requirements.txt
 $env:PYTHONPATH = "$PWD\src"
+python scripts/build_real_masks.py
 python scripts/generate_dataset.py
 python -m pytest -q
 python -m jupyter nbconvert --execute --to notebook --inplace notebooks/evaluacion_segmentacion.ipynb
 ```
 
-En VS Code seleccione `.venv\Scripts\python.exe` como intérprete y abra el notebook. El dataset se regenera sin descargar datos, así que la evidencia es repetible.
+En VS Code seleccione `.venv\Scripts\python.exe` como intérprete y abra el notebook. Las fotografías se versionan localmente y las máscaras se regeneran desde polígonos documentados, sin red ni algoritmos de segmentación.
 
 ## Criterio de evaluación
 
