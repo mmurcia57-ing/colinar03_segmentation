@@ -1,0 +1,541 @@
+{
+  "schema": "integrated-segmentation-evaluation-v1",
+  "generated_on": "2026-10-15",
+  "title": "Evaluación de métodos de segmentación en imágenes urbanas de La Candelaria, Bogotá, con validación complementaria mediante CrackForest Dataset",
+  "algorithms": {
+    "Otsu": "256-bin global threshold; foreground is intensity > threshold.",
+    "K-means": "Own 1-D k=2 implementation; min/max initialization, seed 7, max_iter 100, tolerance 1e-4; brighter cluster is foreground.",
+    "metrics": "IoU, Dice, precision, recall and accuracy; confusion matrices use [[TN, FP], [FN, TP]]."
+  },
+  "case_study": {
+    "id": "la_candelaria",
+    "role": "main case study",
+    "status": "exploratory; manual references are preliminary and failed complete visual validation",
+    "reference_type": "Independent manual polygon masks for urban_built_surface; not validated ground truth.",
+    "preprocessing": "Existing implementations convert RGB to the arithmetic mean of R, G and B; no image-specific tuning.",
+    "rows": [
+      {
+        "image": "01_calle_mural",
+        "method": "Otsu",
+        "parameter": "threshold=90; RGB mean; bins=256",
+        "iou": 0.42112652486188923,
+        "dice": 0.5926657725325561,
+        "precision": 0.7561537628359893,
+        "recall": 0.48730546701988364,
+        "accuracy": 0.4475719591457753
+      },
+      {
+        "image": "01_calle_mural",
+        "method": "K-means",
+        "parameter": "k=2; seed=7; max_iter=100; tolerance=1e-4; centroids=[47.17, 134.18]; RGB mean",
+        "iou": 0.41974923445882045,
+        "dice": 0.5913005258549342,
+        "precision": 0.7562174439202343,
+        "recall": 0.4854359914300222,
+        "accuracy": 0.4465719591457753
+      },
+      {
+        "image": "02_casa_cuervo",
+        "method": "Otsu",
+        "parameter": "threshold=87; RGB mean; bins=256",
+        "iou": 0.2563832222438054,
+        "dice": 0.40812901303461274,
+        "precision": 0.6665356025076973,
+        "recall": 0.29410758852002894,
+        "accuracy": 0.3675789840133102
+      },
+      {
+        "image": "02_casa_cuervo",
+        "method": "K-means",
+        "parameter": "k=2; seed=7; max_iter=100; tolerance=1e-4; centroids=[37.89, 137.15]; RGB mean",
+        "iou": 0.2563832222438054,
+        "dice": 0.40812901303461274,
+        "precision": 0.6665356025076973,
+        "recall": 0.29410758852002894,
+        "accuracy": 0.3675789840133102
+      },
+      {
+        "image": "03_sombras_tarde",
+        "method": "Otsu",
+        "parameter": "threshold=105; RGB mean; bins=256",
+        "iou": 0.4307690709206287,
+        "dice": 0.6021503814636561,
+        "precision": 0.7458268434221158,
+        "recall": 0.5048884198134749,
+        "accuracy": 0.6411424672489083
+      },
+      {
+        "image": "03_sombras_tarde",
+        "method": "K-means",
+        "parameter": "k=2; seed=7; max_iter=100; tolerance=1e-4; centroids=[47.38, 163.44]; RGB mean",
+        "iou": 0.4307690709206287,
+        "dice": 0.6021503814636561,
+        "precision": 0.7458268434221158,
+        "recall": 0.5048884198134749,
+        "accuracy": 0.6411424672489083
+      },
+      {
+        "image": "04_vendedor_peaton",
+        "method": "Otsu",
+        "parameter": "threshold=99; RGB mean; bins=256",
+        "iou": 0.4135462069352529,
+        "dice": 0.5851187671209892,
+        "precision": 0.586209855490037,
+        "recall": 0.5840317328023954,
+        "accuracy": 0.5772727384467681
+      },
+      {
+        "image": "04_vendedor_peaton",
+        "method": "K-means",
+        "parameter": "k=2; seed=7; max_iter=100; tolerance=1e-4; centroids=[36.95, 162.81]; RGB mean",
+        "iou": 0.4132475519477513,
+        "dice": 0.5848197668953462,
+        "precision": 0.5863560167459929,
+        "recall": 0.583291545942978,
+        "accuracy": 0.577288214493312
+      },
+      {
+        "image": "05_calle_candelaria",
+        "method": "Otsu",
+        "parameter": "threshold=138; RGB mean; bins=256",
+        "iou": 0.22836405977100718,
+        "dice": 0.37181820479765426,
+        "precision": 0.5784082419094806,
+        "recall": 0.2739658415749381,
+        "accuracy": 0.29446751126725573
+      },
+      {
+        "image": "05_calle_candelaria",
+        "method": "K-means",
+        "parameter": "k=2; seed=7; max_iter=100; tolerance=1e-4; centroids=[76.25, 201.43]; RGB mean",
+        "iou": 0.227524011398135,
+        "dice": 0.3707039687785625,
+        "precision": 0.5778130514941486,
+        "recall": 0.27289024231249187,
+        "accuracy": 0.29387487135810353
+      }
+    ],
+    "confusion_matrices": {
+      "01_calle_mural": {
+        "Otsu": [
+          [
+            98404,
+            279162
+          ],
+          [
+            910768,
+            865666
+          ]
+        ],
+        "K-means": [
+          [
+            99571,
+            277995
+          ],
+          [
+            914089,
+            862345
+          ]
+        ]
+      },
+      "02_casa_cuervo": {
+        "Otsu": [
+          [
+            3307446,
+            2412829
+          ],
+          [
+            11575312,
+            4822813
+          ]
+        ],
+        "K-means": [
+          [
+            3307446,
+            2412829
+          ],
+          [
+            11575312,
+            4822813
+          ]
+        ]
+      },
+      "03_sombras_tarde": {
+        "Otsu": [
+          [
+            677061,
+            169549
+          ],
+          [
+            487878,
+            497512
+          ]
+        ],
+        "K-means": [
+          [
+            677061,
+            169549
+          ],
+          [
+            487878,
+            497512
+          ]
+        ]
+      },
+      "04_vendedor_peaton": {
+        "Otsu": [
+          [
+            4996950,
+            3766147
+          ],
+          [
+            3800091,
+            5335440
+          ]
+        ],
+        "K-means": [
+          [
+            5003989,
+            3759108
+          ],
+          [
+            3806853,
+            5328678
+          ]
+        ]
+      },
+      "05_calle_candelaria": {
+        "Otsu": [
+          [
+            24140,
+            42886
+          ],
+          [
+            155926,
+            58838
+          ]
+        ],
+        "K-means": [
+          [
+            24204,
+            42822
+          ],
+          [
+            156157,
+            58607
+          ]
+        ]
+      }
+    },
+    "aggregate_pixel_weighted": {
+      "Otsu": {
+        "metrics": {
+          "iou": 0.32916429996494967,
+          "dice": 0.49529512637922907,
+          "precision": 0.634506013475981,
+          "recall": 0.40617923157725344,
+          "accuracy": 0.4670736142575995
+        },
+        "confusion_matrix": [
+          [
+            9104001,
+            6670573
+          ],
+          [
+            16929975,
+            11580269
+          ]
+        ]
+      },
+      "K-means": {
+        "metrics": {
+          "iou": 0.3289484551687428,
+          "dice": 0.4950507356238654,
+          "precision": 0.6345870599242288,
+          "recall": 0.405817466872609,
+          "accuracy": 0.4670274584847566
+        },
+        "confusion_matrix": [
+          [
+            9112271,
+            6662303
+          ],
+          [
+            16940289,
+            11569955
+          ]
+        ]
+      }
+    },
+    "overview_figure": "artifacts/integrated_evaluation/la_candelaria_overview.png"
+  },
+  "complementary_benchmark": {
+    "id": "cfd5",
+    "role": "complementary benchmark",
+    "status": "official references; five selected pairs passed technical alignment and polarity review",
+    "benchmark_manifest": "data/benchmarks/cfd5/manifest.json",
+    "reference_type": "Official CrackForest groundTruth.Segmentation; label 2 is crack/foreground.",
+    "preprocessing": "gray = round(mean(R,G,B)); both methods receive 255 - gray; no per-image tuning.",
+    "rows": [
+      {
+        "image": "001",
+        "method": "Otsu",
+        "parameter": "threshold=129; input=255-gray; bins=256",
+        "iou": 0.026624427069290912,
+        "dice": 0.05186790099139912,
+        "precision": 0.02673751544176129,
+        "recall": 0.8629164391043146,
+        "accuracy": 0.6239322916666666
+      },
+      {
+        "image": "001",
+        "method": "K-means",
+        "parameter": "k=2; seed=7; max_iter=100; tolerance=1e-4; centroids=[118.14, 139.39]; input=255-gray",
+        "iou": 0.02481517297314159,
+        "dice": 0.04842858229967278,
+        "precision": 0.024908413438957947,
+        "recall": 0.8689240851993446,
+        "accuracy": 0.59294921875
+      },
+      {
+        "image": "024",
+        "method": "Otsu",
+        "parameter": "threshold=118; input=255-gray; bins=256",
+        "iou": 0.030073245881072304,
+        "dice": 0.05839049990148842,
+        "precision": 0.030144713116648944,
+        "recall": 0.9269263576912141,
+        "accuracy": 0.31548177083333334
+      },
+      {
+        "image": "024",
+        "method": "K-means",
+        "parameter": "k=2; seed=7; max_iter=100; tolerance=1e-4; centroids=[89.57, 146.2]; input=255-gray",
+        "iou": 0.029945437234510035,
+        "dice": 0.058149560456165615,
+        "precision": 0.030013029196410548,
+        "recall": 0.9300540233153256,
+        "accuracy": 0.3101497395833333
+      },
+      {
+        "image": "050",
+        "method": "Otsu",
+        "parameter": "threshold=124; input=255-gray; bins=256",
+        "iou": 0.016895394184726267,
+        "dice": 0.03322936514678933,
+        "precision": 0.016946215262734418,
+        "recall": 0.8492555831265509,
+        "accuracy": 0.48138671875
+      },
+      {
+        "image": "050",
+        "method": "K-means",
+        "parameter": "k=2; seed=7; max_iter=100; tolerance=1e-4; centroids=[113.27, 134.3]; input=255-gray",
+        "iou": 0.016106385694558873,
+        "dice": 0.03170216410666362,
+        "precision": 0.016148360150314706,
+        "recall": 0.8610421836228288,
+        "accuracy": 0.44798828125
+      },
+      {
+        "image": "074",
+        "method": "Otsu",
+        "parameter": "threshold=133; input=255-gray; bins=256",
+        "iou": 0.02757812705684122,
+        "dice": 0.05367597135573462,
+        "precision": 0.02766224334851786,
+        "recall": 0.9006878761822872,
+        "accuracy": 0.5190690104166666
+      },
+      {
+        "image": "074",
+        "method": "K-means",
+        "parameter": "k=2; seed=7; max_iter=100; tolerance=1e-4; centroids=[124.26, 141.59]; input=255-gray",
+        "iou": 0.02575451737639534,
+        "dice": 0.05021575228792261,
+        "precision": 0.025819822016335488,
+        "recall": 0.9105760963026656,
+        "accuracy": 0.4783854166666667
+      },
+      {
+        "image": "116",
+        "method": "Otsu",
+        "parameter": "threshold=108; input=255-gray; bins=256",
+        "iou": 0.01783736444890915,
+        "dice": 0.03504953752325037,
+        "precision": 0.017865896132710713,
+        "recall": 0.9178263750828363,
+        "accuracy": 0.5035091145833334
+      },
+      {
+        "image": "116",
+        "method": "K-means",
+        "parameter": "k=2; seed=7; max_iter=100; tolerance=1e-4; centroids=[96.89, 121.46]; input=255-gray",
+        "iou": 0.018699729166950202,
+        "dice": 0.036712936366915604,
+        "precision": 0.018734149600501758,
+        "recall": 0.9105367793240556,
+        "accuracy": 0.5305794270833334
+      }
+    ],
+    "confusion_matrices": {
+      "001": {
+        "Otsu": [
+          [
+            94256,
+            57513
+          ],
+          [
+            251,
+            1580
+          ]
+        ],
+        "K-means": [
+          [
+            89486,
+            62283
+          ],
+          [
+            240,
+            1591
+          ]
+        ]
+      },
+      "024": {
+        "Otsu": [
+          [
+            45198,
+            104885
+          ],
+          [
+            257,
+            3260
+          ]
+        ],
+        "K-means": [
+          [
+            44368,
+            105715
+          ],
+          [
+            246,
+            3271
+          ]
+        ]
+      },
+      "050": {
+        "Otsu": [
+          [
+            72572,
+            79416
+          ],
+          [
+            243,
+            1369
+          ]
+        ],
+        "K-means": [
+          [
+            67423,
+            84565
+          ],
+          [
+            224,
+            1388
+          ]
+        ]
+      },
+      "074": {
+        "Otsu": [
+          [
+            77634,
+            73640
+          ],
+          [
+            231,
+            2095
+          ]
+        ],
+        "K-means": [
+          [
+            71362,
+            79912
+          ],
+          [
+            208,
+            2118
+          ]
+        ]
+      },
+      "116": {
+        "Otsu": [
+          [
+            75954,
+            76137
+          ],
+          [
+            124,
+            1385
+          ]
+        ],
+        "K-means": [
+          [
+            80123,
+            71968
+          ],
+          [
+            135,
+            1374
+          ]
+        ]
+      }
+    },
+    "aggregate_pixel_weighted": {
+      "Otsu": {
+        "metrics": {
+          "iou": 0.024078869543174963,
+          "dice": 0.047025420129830735,
+          "precision": 0.02414523524720893,
+          "recall": 0.897545159796202,
+          "accuracy": 0.48867578125
+        },
+        "confusion_matrix": [
+          [
+            365614,
+            391591
+          ],
+          [
+            1106,
+            9689
+          ]
+        ]
+      },
+      "K-means": {
+        "metrics": {
+          "iou": 0.02346124391312934,
+          "dice": 0.0458468633818062,
+          "precision": 0.023520890423361543,
+          "recall": 0.9024548402037981,
+          "accuracy": 0.47201041666666665
+        },
+        "confusion_matrix": [
+          [
+            352762,
+            404443
+          ],
+          [
+            1053,
+            9742
+          ]
+        ]
+      }
+    },
+    "overview_figure": "artifacts/integrated_evaluation/cfd_overview.png"
+  },
+  "quality_gates": {
+    "cfd_pair_integrity": "passed",
+    "cfd_visual_alignment_and_polarity": "passed by technical visual inspection of five review sheets",
+    "la_candelaria_reference_validation": "pending; preliminary masks contain known visual errors",
+    "qg1": "not approved"
+  }
+}
