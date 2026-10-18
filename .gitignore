@@ -31,3 +31,6 @@ artifacts/ai_proposals_repro/
 artifacts/review_sheets/
 artifacts/review_sheets_repro/
 artifacts/cfd_benchmark/
+
+# Paquete de entrega generado localmente
+entrega/

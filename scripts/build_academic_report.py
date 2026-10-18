@@ -15,7 +15,7 @@ from reportlab.lib.units import cm
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.platypus import Image as RLImage
-from reportlab.platypus import KeepTogether, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+from reportlab.platypus import KeepTogether, PageBreak, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
 ROOT = Path(__file__).resolve().parents[1]
 OUTPUT = ROOT / "deliverables"
@@ -25,6 +25,13 @@ pdfmetrics.registerFont(TTFont("DejaVu", str(FONT_DIR / "DejaVuSans.ttf")))
 pdfmetrics.registerFont(TTFont("DejaVu-Bold", str(FONT_DIR / "DejaVuSans-Bold.ttf")))
 pdfmetrics.registerFont(TTFont("DejaVu-Oblique", str(FONT_DIR / "DejaVuSans-Oblique.ttf")))
 pdfmetrics.registerFontFamily("DejaVu", normal="DejaVu", bold="DejaVu-Bold", italic="DejaVu-Oblique", boldItalic="DejaVu-Bold")
+
+
+COURSE = "Percepción Computacional (COEINTAR) - Enero 2026 - PER 15708"
+ASSIGNMENT = "Trabajo: Evaluación de la segmentación"
+AUTHORS = (("Torres Arredondo", "Mateo"), ("Alvarez", "Edna Mayerli"), ("Murcia", "Manuel Alejandro"))
+PROFESSOR = "Luis Fernando Barajas Ardila"
+DATE = "18/10/2026"
 
 
 def fmt(value: float) -> str:
@@ -182,7 +189,21 @@ def metric_rows(rows: list[dict]) -> list[list[str]]:
 
 def write_markdown(path: Path, results: dict) -> None:
     cfd, cand = results["cfd"], results["la_candelaria"]
-    lines = [f"# {results['title']}", "", "## 1. Introducción y objetivos", ""]
+    lines = [
+        f"# {results['title']}",
+        "",
+        f"**Universidad Internacional de La Rioja (UNIR)** — {COURSE}",
+        "",
+        f"**{ASSIGNMENT}**",
+        "",
+        "**Integrantes:** " + "; ".join(f"{name} {surname}" for surname, name in AUTHORS),
+        "",
+        f"**Profesor:** {PROFESSOR}  ",
+        f"**Fecha:** {DATE}",
+        "",
+        "## 1. Introducción y objetivos",
+        "",
+    ]
     lines += [to_markdown(t) + "\n" for t in INTRO]
     lines += ["## 2. Métodos de segmentación", ""]
     lines += [to_markdown(t) + "\n" for t in (PREPROCESSING, BASELINES, REGION_GROWING, WATERSHED, AUTHORSHIP)]
@@ -233,45 +254,89 @@ def _figure(path: Path, width_cm: float) -> RLImage:
 
 def _header() -> Table:
     blue = colors.HexColor("#0098cd")
+    authors = "\n".join(f"{surname}, {name}" for surname, name in AUTHORS)
     data = [
-        ["Asignatura", "Datos del alumno", "", "Fecha"],
-        ["Percepción\nComputacional", "Apellidos:", "", ""],
-        ["", "Nombre:", "", ""],
+        ["Asignatura", "Datos de los alumnos", "Fecha"],
+        ["Percepción\nComputacional", f"Apellidos, Nombre:\n{authors}", DATE],
     ]
-    table = Table(data, colWidths=[4.2 * cm, 3.0 * cm, 6.0 * cm, 4.0 * cm])
+    table = Table(data, colWidths=[4.2 * cm, 9.0 * cm, 4.0 * cm])
     table.setStyle(
         TableStyle(
             [
                 ("FONTNAME", (0, 0), (-1, -1), "DejaVu"),
                 ("FONTNAME", (0, 1), (0, 1), "DejaVu-Bold"),
                 ("FONTSIZE", (0, 0), (-1, -1), 8),
+                ("LEADING", (0, 1), (-1, 1), 10.5),
                 ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#d9eff7")),
                 ("TEXTCOLOR", (0, 0), (-1, 0), blue),
-                ("SPAN", (1, 0), (2, 0)),
-                ("SPAN", (0, 1), (0, 2)),
-                ("SPAN", (3, 1), (3, 2)),
-                ("SPAN", (1, 1), (2, 1)),
-                ("SPAN", (1, 2), (2, 2)),
-                ("ALIGN", (0, 0), (-1, 0), "CENTER"),
-                ("ALIGN", (0, 1), (0, 2), "CENTER"),
+                ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+                ("ALIGN", (1, 1), (1, 1), "LEFT"),
                 ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
                 ("LINEABOVE", (0, 0), (-1, 0), 0.8, blue),
                 ("LINEBELOW", (0, 0), (-1, 0), 0.8, blue),
-                ("LINEBELOW", (1, 1), (2, 1), 0.5, blue),
-                ("LINEBELOW", (0, 2), (-1, 2), 0.8, blue),
-                ("LINEBEFORE", (1, 0), (1, 2), 0.5, blue),
-                ("LINEBEFORE", (3, 0), (3, 2), 0.5, blue),
+                ("LINEBELOW", (0, 1), (-1, 1), 0.8, blue),
+                ("LINEBEFORE", (1, 0), (2, 1), 0.5, blue),
             ]
         )
     )
     return table
 
 
+def _cover(title_text: str) -> list:
+    blue = colors.HexColor("#0098cd")
+    base = getSampleStyleSheet()
+    center = ParagraphStyle("CoverCenter", parent=base["BodyText"], fontName="DejaVu", fontSize=11, leading=15, alignment=TA_CENTER)
+    brand = ParagraphStyle("CoverBrand", parent=center, fontName="DejaVu-Bold", fontSize=13, leading=17, textColor=blue)
+    course = ParagraphStyle("CoverCourse", parent=center, fontSize=12, leading=16, textColor=colors.HexColor("#0b4f6c"))
+    assignment = ParagraphStyle("CoverAssignment", parent=center, fontName="DejaVu-Bold", fontSize=14, leading=18)
+    title = ParagraphStyle("CoverTitle", parent=center, fontSize=19, leading=25, textColor=blue)
+    label = ParagraphStyle("CoverLabel", parent=center, fontName="DejaVu-Bold", fontSize=10.5, leading=14, textColor=colors.HexColor("#0b4f6c"))
+
+    def rule() -> Table:
+        line = Table([[""]], colWidths=[12 * cm], rowHeights=[0.1 * cm])
+        line.setStyle(TableStyle([("LINEBELOW", (0, 0), (-1, -1), 1.2, blue)]))
+        return line
+
+    story = [
+        Spacer(1, 2.2 * cm),
+        Paragraph("Universidad Internacional de La Rioja (UNIR)", brand),
+        Spacer(1, 0.3 * cm),
+        Paragraph(COURSE, course),
+        Spacer(1, 2.6 * cm),
+        Paragraph(ASSIGNMENT, assignment),
+        Spacer(1, 0.5 * cm),
+        rule(),
+        Spacer(1, 0.5 * cm),
+        Paragraph(title_text, title),
+        Spacer(1, 0.5 * cm),
+        rule(),
+        Spacer(1, 3.0 * cm),
+        Paragraph("Integrantes", label),
+        Spacer(1, 0.15 * cm),
+    ]
+    story += [Paragraph(f"{name} {surname}", center) for surname, name in AUTHORS]
+    story += [
+        Spacer(1, 1.0 * cm),
+        Paragraph("Profesor", label),
+        Spacer(1, 0.15 * cm),
+        Paragraph(PROFESSOR, center),
+        Spacer(1, 2.6 * cm),
+        Paragraph(DATE, center),
+        PageBreak(),
+    ]
+    return story
+
+
 def page_number(canvas, doc) -> None:
+    """Numera las páginas de contenido; la portada no lleva número."""
     canvas.saveState()
     canvas.setFont("DejaVu", 7.5)
-    canvas.drawRightString(A4[0] - 1.6 * cm, 0.8 * cm, f"Página {doc.page}")
+    canvas.drawRightString(A4[0] - 1.6 * cm, 0.8 * cm, f"Página {doc.page - 1}")
     canvas.restoreState()
+
+
+def no_page_number(canvas, doc) -> None:
+    pass
 
 
 def build_pdf(path: Path, results: dict) -> None:
@@ -282,9 +347,12 @@ def build_pdf(path: Path, results: dict) -> None:
     caption = ParagraphStyle("Caption", parent=small, fontName="DejaVu-Oblique", alignment=TA_CENTER, spaceAfter=5)
     title = ParagraphStyle("TitleX", parent=base["Title"], fontName="DejaVu", fontSize=15, leading=19, textColor=colors.HexColor("#0098cd"), spaceBefore=8, spaceAfter=8)
     h1 = ParagraphStyle("H1", parent=base["Heading2"], fontName="DejaVu-Bold", fontSize=11, leading=13.5, spaceBefore=5, spaceAfter=3, textColor=colors.HexColor("#0b4f6c"))
-    doc = SimpleDocTemplate(str(path), pagesize=A4, leftMargin=1.9 * cm, rightMargin=1.9 * cm, topMargin=1.4 * cm, bottomMargin=1.5 * cm, title=results["title"])
+    doc = SimpleDocTemplate(
+        str(path), pagesize=A4, leftMargin=1.9 * cm, rightMargin=1.9 * cm, topMargin=1.4 * cm, bottomMargin=1.5 * cm,
+        title=results["title"], author="; ".join(f"{name} {surname}" for surname, name in AUTHORS),
+    )
 
-    story: list = [_header(), Paragraph(results["title"], title)]
+    story: list = _cover(results["title"]) + [_header(), Paragraph(results["title"], title)]
     story.append(Paragraph("1. Introducción y objetivos", h1))
     story += [Paragraph(text, body) for text in INTRO]
     story.append(Paragraph("2. Métodos de segmentación", h1))
@@ -387,7 +455,7 @@ def build_pdf(path: Path, results: dict) -> None:
     story += [Paragraph(text, body) for text in conclusions(cfd, cand)]
     story.append(Paragraph("Referencias", h1))
     story += [Paragraph(text, small) for text in REFERENCES]
-    doc.build(story, onFirstPage=page_number, onLaterPages=page_number)
+    doc.build(story, onFirstPage=no_page_number, onLaterPages=page_number)
 
 
 def main() -> None:

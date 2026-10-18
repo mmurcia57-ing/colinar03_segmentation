@@ -1,5 +1,14 @@
 # Evaluación de segmentadores por umbralización y crecimiento de regiones frente a ground truth: CrackForest Dataset y escenas urbanas de La Candelaria
 
+**Universidad Internacional de La Rioja (UNIR)** — Percepción Computacional (COEINTAR) - Enero 2026 - PER 15708
+
+**Trabajo: Evaluación de la segmentación**
+
+**Integrantes:** Mateo Torres Arredondo; Edna Mayerli Alvarez; Manuel Alejandro Murcia
+
+**Profesor:** Luis Fernando Barajas Ardila  
+**Fecha:** 18/10/2026
+
 ## 1. Introducción y objetivos
 
 La segmentación divide una imagen en regiones homogéneas que corresponden a los objetos de interés. Este trabajo construye cuatro segmentadores y mide su rendimiento frente a imágenes de *ground truth* con un evaluador implementado desde cero.

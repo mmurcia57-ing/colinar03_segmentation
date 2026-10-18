@@ -20,7 +20,10 @@ def code(text: str):
 CELLS = [
     md(
         "# Evaluación de segmentadores frente a *ground truth*\n\n"
-        "**Asignatura:** Percepción Computacional (UNIR) — Trabajo: Evaluación de la segmentación.\n\n"
+        "**Asignatura:** Percepción Computacional (COEINTAR) - Enero 2026 - PER 15708 — UNIR. "
+        "Trabajo: Evaluación de la segmentación.\n\n"
+        "**Integrantes:** Mateo Torres Arredondo, Edna Mayerli Alvarez y Manuel Alejandro Murcia. "
+        "**Profesor:** Luis Fernando Barajas Ardila. **Fecha:** 18/10/2026.\n\n"
         "**Objetivo.** Construir cuatro segmentadores y evaluar su rendimiento frente a imágenes de *ground truth* "
         "con un evaluador implementado desde cero.\n\n"
         "| Segmentador | Familia | Papel |\n|---|---|---|\n"
