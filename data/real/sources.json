@@ -1,0 +1,48 @@
+{
+  "schema": "image-provenance-v1",
+  "retrieved": "2026-10-15",
+  "location": "La Candelaria, Bogota, Colombia",
+  "license_note": "Las licencias se refieren a los archivos originales en Wikimedia Commons. La reutilizacion debe conservar autor, licencia y enlace a la pagina de archivo.",
+  "images": [
+    {
+      "local_file": "01_calle_mural.jpg",
+      "title": "La Candelaria, Bogota, Colombia (5818105341).jpg",
+      "author": "Pedro Szekely",
+      "license": "CC BY-SA 2.0",
+      "source_page": "https://commons.wikimedia.org/wiki/File:La_Candelaria,_Bogota,_Colombia_(5818105341).jpg",
+      "download_url": "https://upload.wikimedia.org/wikipedia/commons/4/41/La_Candelaria%2C_Bogota%2C_Colombia_%285818105341%29.jpg"
+    },
+    {
+      "local_file": "02_casa_cuervo.jpg",
+      "title": "Casa Cuervo Urisarri.jpg",
+      "author": "Instituto Caro y Cuervo; EXIF author Juan Andres Rodriguez Suarez",
+      "license": "CC BY-SA 4.0",
+      "source_page": "https://commons.wikimedia.org/wiki/File:Casa_Cuervo_Urisarri.jpg",
+      "download_url": "https://upload.wikimedia.org/wikipedia/commons/d/dc/Casa_Cuervo_Urisarri.jpg"
+    },
+    {
+      "local_file": "03_sombras_tarde.jpg",
+      "title": "Tarde en la Candelaria - panoramio.jpg",
+      "author": "Amel Segré",
+      "license": "CC BY-SA 3.0",
+      "source_page": "https://commons.wikimedia.org/wiki/File:Tarde_en_la_Candelaria_-_panoramio.jpg",
+      "download_url": "https://upload.wikimedia.org/wikipedia/commons/4/4a/Tarde_en_la_Candelaria_-_panoramio.jpg"
+    },
+    {
+      "local_file": "04_vendedor_peaton.jpg",
+      "title": "2017 Bogotá carrera 10 con calle 12 vendedor de jugo de naranja.jpg",
+      "author": "Felipe Restrepo Acosta",
+      "license": "CC BY-SA 4.0",
+      "source_page": "https://commons.wikimedia.org/wiki/File:2017_Bogot%C3%A1_carrera_10_con_calle_12_vendedor_de_jugo_de_naranja.jpg",
+      "download_url": "https://upload.wikimedia.org/wikipedia/commons/b/b3/2017_Bogot%C3%A1_carrera_10_con_calle_12_vendedor_de_jugo_de_naranja.jpg"
+    },
+    {
+      "local_file": "05_calle_candelaria.jpg",
+      "title": "La Candelaria.JPG",
+      "author": "Tequendamia",
+      "license": "Public domain",
+      "source_page": "https://commons.wikimedia.org/wiki/File:La_Candelaria.JPG",
+      "download_url": "https://upload.wikimedia.org/wikipedia/commons/5/5c/La_Candelaria.JPG"
+    }
+  ]
+}

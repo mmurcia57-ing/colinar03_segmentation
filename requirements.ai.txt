@@ -1,0 +1,9 @@
+# Isolated Python 3.12 environment for local assisted proposals.
+torch==2.14.1+cpu
+torchvision==0.29.1+cpu
+mobile-sam==1.0
+timm>=1.0
+opencv-python>=5
+labelme>=7
+matplotlib>=3.8
+scikit-image>=0.26

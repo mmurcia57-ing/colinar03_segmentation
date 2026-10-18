@@ -1,0 +1,1152 @@
+{
+  "schema": "segmentation-evaluation-v2",
+  "title": "Evaluación de segmentadores por umbralización y crecimiento de regiones frente a ground truth: CrackForest Dataset y escenas urbanas de La Candelaria",
+  "algorithms": {
+    "Otsu": "Línea base: umbral global que maximiza la varianza entre clases (histograma de 256 niveles).",
+    "K-means": "Línea base: K-means 1-D propio, k=2, inicialización mín./máx., semilla 7; grupo claro = objeto.",
+    "Region Growing": "Crecimiento de regiones por semillas (Tema 10.4), propio: semillas por percentil, vecindad 8, criterio |I(p) - media de la región| <= T.",
+    "Watershed": "Watershed con marcadores (Tema 10.7), inundación propia por cola de prioridad sobre el gradiente de Sobel; marcadores de fondo por mapa de distancias.",
+    "metrics": "Evaluador propio: IoU, Dice, precisión, recall y exactitud; matrices [[TN, FP], [FN, TP]]."
+  },
+  "cfd": {
+    "id": "cfd5",
+    "role": "evaluación cuantitativa principal",
+    "benchmark_manifest": "data/benchmarks/cfd5/manifest.json",
+    "reference_type": "Anotación oficial CrackForest groundTruth.Segmentation; etiqueta 2 = grieta (objeto).",
+    "preprocessing": "gris = media RGB; suavizado gaussiano sigma=1.5; inversión 255-I; resta de fondo I' = 4*(I - G15*I) + 128; la misma entrada para los cuatro métodos.",
+    "parameters": {
+      "smoothing_sigma": 1.5,
+      "background_sigma": 15.0,
+      "contrast_gain": 4.0,
+      "kmeans_seed": 7,
+      "rg_seed_percentile": 99.8,
+      "rg_tolerance": 30.0,
+      "ws_seed_percentile": 99.5,
+      "ws_background_distance": 3.0
+    },
+    "rows": [
+      {
+        "image": "001",
+        "method": "Otsu",
+        "parameter": "threshold=131; bins=256",
+        "iou": 0.03277950785736144,
+        "dice": 0.06347823055739533,
+        "precision": 0.032785409502547574,
+        "recall": 0.9945385035499726,
+        "accuracy": 0.6501822916666666
+      },
+      {
+        "image": "001",
+        "method": "K-means",
+        "parameter": "k=2; seed=7; max_iter=100; tolerance=1e-4; centroids=[118.25, 143.35]",
+        "iou": 0.030519774200572874,
+        "dice": 0.059231807025243416,
+        "precision": 0.030524375942368905,
+        "recall": 0.9950846531949754,
+        "accuracy": 0.6231966145833333
+      },
+      {
+        "image": "001",
+        "method": "Region Growing",
+        "parameter": "seeds>=P99.8 (331 px); |I-mu_R|<=30; 8-neighborhood",
+        "iou": 0.6455223880597015,
+        "dice": 0.7845804988662132,
+        "precision": 0.8155568650559811,
+        "recall": 0.7558711086837794,
+        "accuracy": 0.9950520833333333
+      },
+      {
+        "image": "001",
+        "method": "Watershed",
+        "parameter": "object markers>=P99.5; background markers: distance>3 px from I>131; Sobel relief; 4-neighborhood",
+        "iou": 0.6524390243902439,
+        "dice": 0.7896678966789668,
+        "precision": 0.7184422560429723,
+        "recall": 0.8765701802293828,
+        "accuracy": 0.99443359375
+      },
+      {
+        "image": "024",
+        "method": "Otsu",
+        "parameter": "threshold=144; bins=256",
+        "iou": 0.09646592138478183,
+        "dice": 0.17595790166091105,
+        "precision": 0.097364190603294,
+        "recall": 0.9127096957634347,
+        "accuracy": 0.8042578125
+      },
+      {
+        "image": "024",
+        "method": "K-means",
+        "parameter": "k=2; seed=7; max_iter=100; tolerance=1e-4; centroids=[112.66, 169.31]",
+        "iou": 0.0811969024885347,
+        "dice": 0.15019817815172798,
+        "precision": 0.08176449805683138,
+        "recall": 0.9212396929201023,
+        "accuracy": 0.76130859375
+      },
+      {
+        "image": "024",
+        "method": "Region Growing",
+        "parameter": "seeds>=P99.8 (2017 px); |I-mu_R|<=30; 8-neighborhood",
+        "iou": 0.260553387726144,
+        "dice": 0.41339524412551004,
+        "precision": 0.4091922005571031,
+        "recall": 0.4176855274381575,
+        "accuracy": 0.9728580729166667
+      },
+      {
+        "image": "024",
+        "method": "Watershed",
+        "parameter": "object markers>=P99.5; background markers: distance>3 px from I>144; Sobel relief; 4-neighborhood",
+        "iou": 0.2562736576475536,
+        "dice": 0.4079901796674478,
+        "precision": 0.3357825128581925,
+        "recall": 0.5197611600796133,
+        "accuracy": 0.9654622395833333
+      },
+      {
+        "image": "050",
+        "method": "Otsu",
+        "parameter": "threshold=129; bins=256",
+        "iou": 0.021806539077260337,
+        "dice": 0.042682324380019475,
+        "precision": 0.02183803457688808,
+        "recall": 0.9379652605459057,
+        "accuracy": 0.5584309895833334
+      },
+      {
+        "image": "050",
+        "method": "K-means",
+        "parameter": "k=2; seed=7; max_iter=100; tolerance=1e-4; centroids=[112.91, 144.76]",
+        "iou": 0.020745409701288024,
+        "dice": 0.040647568931726046,
+        "precision": 0.020773304794050658,
+        "recall": 0.9392059553349876,
+        "accuracy": 0.5347265625
+      },
+      {
+        "image": "050",
+        "method": "Region Growing",
+        "parameter": "seeds>=P99.8 (314 px); |I-mu_R|<=30; 8-neighborhood",
+        "iou": 0.30196253345227475,
+        "dice": 0.46385748544021926,
+        "precision": 0.5179801071155318,
+        "recall": 0.41997518610421836,
+        "accuracy": 0.9898111979166667
+      },
+      {
+        "image": "050",
+        "method": "Watershed",
+        "parameter": "object markers>=P99.5; background markers: distance>3 px from I>129; Sobel relief; 4-neighborhood",
+        "iou": 0.3342140026420079,
+        "dice": 0.500990099009901,
+        "precision": 0.41680395387149916,
+        "recall": 0.6277915632754343,
+        "accuracy": 0.986875
+      },
+      {
+        "image": "074",
+        "method": "Otsu",
+        "parameter": "threshold=129; bins=256",
+        "iou": 0.032909455694923574,
+        "dice": 0.0637218596721678,
+        "precision": 0.032931320863724994,
+        "recall": 0.9802235597592434,
+        "accuracy": 0.5637955729166667
+      },
+      {
+        "image": "074",
+        "method": "K-means",
+        "parameter": "k=2; seed=7; max_iter=100; tolerance=1e-4; centroids=[113.77, 143.84]",
+        "iou": 0.031342668863261945,
+        "dice": 0.06078032027474941,
+        "precision": 0.03136118246631042,
+        "recall": 0.9815133276010318,
+        "accuracy": 0.54064453125
+      },
+      {
+        "image": "074",
+        "method": "Region Growing",
+        "parameter": "seeds>=P99.8 (317 px); |I-mu_R|<=30; 8-neighborhood",
+        "iou": 0.36619718309859156,
+        "dice": 0.5360824742268041,
+        "precision": 0.7264705882352941,
+        "recall": 0.4247635425623388,
+        "accuracy": 0.9888671875
+      },
+      {
+        "image": "074",
+        "method": "Watershed",
+        "parameter": "object markers>=P99.5; background markers: distance>3 px from I>129; Sobel relief; 4-neighborhood",
+        "iou": 0.4347699475829936,
+        "dice": 0.6060483052567486,
+        "precision": 0.5740099961553249,
+        "recall": 0.6418744625967326,
+        "accuracy": 0.98736328125
+      },
+      {
+        "image": "116",
+        "method": "Otsu",
+        "parameter": "threshold=127; bins=256",
+        "iou": 0.019119676908133532,
+        "dice": 0.03752194632555807,
+        "precision": 0.01912285411154146,
+        "recall": 0.9913850231941683,
+        "accuracy": 0.5003385416666667
+      },
+      {
+        "image": "116",
+        "method": "K-means",
+        "parameter": "k=2; seed=7; max_iter=100; tolerance=1e-4; centroids=[108.53, 146.75]",
+        "iou": 0.019119676908133532,
+        "dice": 0.03752194632555807,
+        "precision": 0.01912285411154146,
+        "recall": 0.9913850231941683,
+        "accuracy": 0.5003385416666667
+      },
+      {
+        "image": "116",
+        "method": "Region Growing",
+        "parameter": "seeds>=P99.8 (320 px); |I-mu_R|<=30; 8-neighborhood",
+        "iou": 0.36056338028169016,
+        "dice": 0.5300207039337475,
+        "precision": 0.4348195329087049,
+        "recall": 0.6785950960901259,
+        "accuracy": 0.9881770833333333
+      },
+      {
+        "image": "116",
+        "method": "Watershed",
+        "parameter": "object markers>=P99.5; background markers: distance>3 px from I>127; Sobel relief; 4-neighborhood",
+        "iou": 0.21914751171613478,
+        "dice": 0.3595094270547318,
+        "precision": 0.24835609509357612,
+        "recall": 0.6507620941020543,
+        "accuracy": 0.9772200520833333
+      }
+    ],
+    "confusion_matrices": {
+      "001": {
+        "Otsu": [
+          [
+            98047,
+            53722
+          ],
+          [
+            10,
+            1821
+          ]
+        ],
+        "K-means": [
+          [
+            93901,
+            57868
+          ],
+          [
+            9,
+            1822
+          ]
+        ],
+        "Region Growing": [
+          [
+            151456,
+            313
+          ],
+          [
+            447,
+            1384
+          ]
+        ],
+        "Watershed": [
+          [
+            151140,
+            629
+          ],
+          [
+            226,
+            1605
+          ]
+        ]
+      },
+      "024": {
+        "Otsu": [
+          [
+            120324,
+            29759
+          ],
+          [
+            307,
+            3210
+          ]
+        ],
+        "K-means": [
+          [
+            113697,
+            36386
+          ],
+          [
+            277,
+            3240
+          ]
+        ],
+        "Region Growing": [
+          [
+            147962,
+            2121
+          ],
+          [
+            2048,
+            1469
+          ]
+        ],
+        "Watershed": [
+          [
+            146467,
+            3616
+          ],
+          [
+            1689,
+            1828
+          ]
+        ]
+      },
+      "050": {
+        "Otsu": [
+          [
+            84263,
+            67725
+          ],
+          [
+            100,
+            1512
+          ]
+        ],
+        "K-means": [
+          [
+            80620,
+            71368
+          ],
+          [
+            98,
+            1514
+          ]
+        ],
+        "Region Growing": [
+          [
+            151358,
+            630
+          ],
+          [
+            935,
+            677
+          ]
+        ],
+        "Watershed": [
+          [
+            150572,
+            1416
+          ],
+          [
+            600,
+            1012
+          ]
+        ]
+      },
+      "074": {
+        "Otsu": [
+          [
+            84319,
+            66955
+          ],
+          [
+            46,
+            2280
+          ]
+        ],
+        "K-means": [
+          [
+            80760,
+            70514
+          ],
+          [
+            43,
+            2283
+          ]
+        ],
+        "Region Growing": [
+          [
+            150902,
+            372
+          ],
+          [
+            1338,
+            988
+          ]
+        ],
+        "Watershed": [
+          [
+            150166,
+            1108
+          ],
+          [
+            833,
+            1493
+          ]
+        ]
+      },
+      "116": {
+        "Otsu": [
+          [
+            75356,
+            76735
+          ],
+          [
+            13,
+            1496
+          ]
+        ],
+        "K-means": [
+          [
+            75356,
+            76735
+          ],
+          [
+            13,
+            1496
+          ]
+        ],
+        "Region Growing": [
+          [
+            150760,
+            1331
+          ],
+          [
+            485,
+            1024
+          ]
+        ],
+        "Watershed": [
+          [
+            149119,
+            2972
+          ],
+          [
+            527,
+            982
+          ]
+        ]
+      }
+    },
+    "mean_per_image": {
+      "Otsu": {
+        "iou": 0.04061622018449214,
+        "dice": 0.07667245251921034,
+        "precision": 0.04080836193159922,
+        "recall": 0.963364408562545,
+        "accuracy": 0.6154010416666666
+      },
+      "K-means": {
+        "iou": 0.03658488643235822,
+        "dice": 0.06967596414180097,
+        "precision": 0.03670924307422056,
+        "recall": 0.9656857304490531,
+        "accuracy": 0.5920429687500001
+      },
+      "Region Growing": {
+        "iou": 0.38695977452368036,
+        "dice": 0.5455872813184989,
+        "precision": 0.580803858774523,
+        "recall": 0.5393780921757239,
+        "accuracy": 0.986953125
+      },
+      "Watershed": {
+        "iou": 0.37936882879578676,
+        "dice": 0.5328411815335592,
+        "precision": 0.458678962804313,
+        "recall": 0.6633518920566435,
+        "accuracy": 0.9822708333333333
+      }
+    },
+    "aggregate_pixel_weighted": {
+      "Otsu": {
+        "metrics": {
+          "iou": 0.03375630947590868,
+          "dice": 0.06530805987152305,
+          "precision": 0.03380895434365939,
+          "recall": 0.9559055118110236,
+          "accuracy": 0.6154010416666666
+        },
+        "confusion_matrix": [
+          [
+            462309,
+            294896
+          ],
+          [
+            476,
+            10319
+          ]
+        ]
+      },
+      "K-means": {
+        "metrics": {
+          "iou": 0.031992856833896674,
+          "dice": 0.062002089688971654,
+          "precision": 0.03203640796223076,
+          "recall": 0.9592403890690134,
+          "accuracy": 0.59204296875
+        },
+        "confusion_matrix": [
+          [
+            444334,
+            312871
+          ],
+          [
+            440,
+            10355
+          ]
+        ]
+      },
+      "Region Growing": {
+        "metrics": {
+          "iou": 0.3561238915306516,
+          "dice": 0.5252084912812737,
+          "precision": 0.537588514889902,
+          "recall": 0.5133858267716536,
+          "accuracy": 0.986953125
+        },
+        "confusion_matrix": [
+          [
+            752438,
+            4767
+          ],
+          [
+            5253,
+            5542
+          ]
+        ]
+      },
+      "Watershed": {
+        "metrics": {
+          "iou": 0.3369692247760031,
+          "dice": 0.504079254079254,
+          "precision": 0.4153412160134446,
+          "recall": 0.6410375173691524,
+          "accuracy": 0.9822708333333333
+        },
+        "confusion_matrix": [
+          [
+            747464,
+            9741
+          ],
+          [
+            3875,
+            6920
+          ]
+        ]
+      }
+    },
+    "sensitivity": {
+      "region_growing_tolerance": [
+        {
+          "tolerance": 20.0,
+          "mean_dice": 0.43118190384123406,
+          "mean_iou": 0.2801046854749991,
+          "mean_recall": 0.33092225288417837,
+          "mean_precision": 0.6774256718161211
+        },
+        {
+          "tolerance": 25.0,
+          "mean_dice": 0.5082652568179661,
+          "mean_iou": 0.3493865554868626,
+          "mean_recall": 0.44622765748001425,
+          "mean_precision": 0.6312076805098162
+        },
+        {
+          "tolerance": 30.0,
+          "mean_dice": 0.5455872813184989,
+          "mean_iou": 0.38695977452368036,
+          "mean_recall": 0.5393780921757239,
+          "mean_precision": 0.580803858774523
+        },
+        {
+          "tolerance": 35.0,
+          "mean_dice": 0.5491664785324963,
+          "mean_iou": 0.39272523595562825,
+          "mean_recall": 0.6142305696554633,
+          "mean_precision": 0.5224563799775294
+        },
+        {
+          "tolerance": 40.0,
+          "mean_dice": 0.4731908310913272,
+          "mean_iou": 0.34548469195521025,
+          "mean_recall": 0.7190050517026674,
+          "mean_precision": 0.42540909512630554
+        }
+      ],
+      "watershed_background_distance": [
+        {
+          "background_distance": 3.0,
+          "mean_dice": 0.5328411815335592,
+          "mean_iou": 0.37936882879578676,
+          "mean_recall": 0.6633518920566435,
+          "mean_precision": 0.458678962804313
+        },
+        {
+          "background_distance": 5.0,
+          "mean_dice": 0.5064413513436354,
+          "mean_iou": 0.36074315698450987,
+          "mean_recall": 0.6634844301613485,
+          "mean_precision": 0.4346732517528487
+        },
+        {
+          "background_distance": 8.0,
+          "mean_dice": 0.46365491969271294,
+          "mean_iou": 0.3346457624353495,
+          "mean_recall": 0.6690510305589629,
+          "mean_precision": 0.40370147407155904
+        }
+      ]
+    },
+    "overview_figure": "deliverables/figures/cfd_overview.png",
+    "steps_figure": "deliverables/figures/cfd_pasos.png"
+  },
+  "la_candelaria": {
+    "id": "la_candelaria",
+    "role": "aplicación secundaria con métricas orientativas",
+    "reference_type": "Máscaras manuales propias de urban_built_surface (fachadas, cubiertas y pavimento), elaboradas sin usar los segmentadores; no son una anotación experta validada.",
+    "preprocessing": "reducción a lado máximo 1024 px; gris = media RGB; suavizado gaussiano sigma=1.5; las máscaras se reescalan por vecino más cercano a la resolución original antes de evaluar.",
+    "parameters": {
+      "working_max_side": 1024,
+      "smoothing_sigma": 1.5,
+      "kmeans_seed": 7,
+      "rg_seed_percentile": 70.0,
+      "rg_tolerance": 25.0,
+      "ws_seed_percentile": 80.0,
+      "ws_background_distance": 10.0
+    },
+    "rows": [
+      {
+        "image": "01_calle_mural",
+        "method": "Otsu",
+        "parameter": "threshold=90; bins=256",
+        "iou": 0.42321748675727905,
+        "dice": 0.5947333990696759,
+        "precision": 0.7557447775932414,
+        "recall": 0.49027940244332185,
+        "accuracy": 0.4489442896935933
+      },
+      {
+        "image": "01_calle_mural",
+        "method": "K-means",
+        "parameter": "k=2; seed=7; max_iter=100; tolerance=1e-4; centroids=[52.7, 129.4]",
+        "iou": 0.4180986385338191,
+        "dice": 0.5896608700874205,
+        "precision": 0.7552101234044835,
+        "recall": 0.48364194785733666,
+        "accuracy": 0.44486583101207056
+      },
+      {
+        "image": "01_calle_mural",
+        "method": "Region Growing",
+        "parameter": "seeds>=P70 (212678 px); |I-mu_R|<=25; 8-neighborhood",
+        "iou": 0.2416336678452021,
+        "dice": 0.38921893647511374,
+        "precision": 0.7242908820136147,
+        "recall": 0.2661106463848361,
+        "accuracy": 0.31120937790157843
+      },
+      {
+        "image": "01_calle_mural",
+        "method": "Watershed",
+        "parameter": "object markers>=P80; background markers: distance>10 px from I>90; Sobel relief; 4-neighborhood",
+        "iou": 0.4205076429330914,
+        "dice": 0.5920526299525135,
+        "precision": 0.7589508933287323,
+        "recall": 0.4853262209572661,
+        "accuracy": 0.4484168987929434
+      },
+      {
+        "image": "02_casa_cuervo",
+        "method": "Otsu",
+        "parameter": "threshold=83; bins=256",
+        "iou": 0.24855435094147285,
+        "dice": 0.39814742666837105,
+        "precision": 0.6547103597025302,
+        "recall": 0.28605166749247246,
+        "accuracy": 0.3588477466724537
+      },
+      {
+        "image": "02_casa_cuervo",
+        "method": "K-means",
+        "parameter": "k=2; seed=7; max_iter=100; tolerance=1e-4; centroids=[46.51, 120.12]",
+        "iou": 0.24855435094147285,
+        "dice": 0.39814742666837105,
+        "precision": 0.6547103597025302,
+        "recall": 0.28605166749247246,
+        "accuracy": 0.3588477466724537
+      },
+      {
+        "image": "02_casa_cuervo",
+        "method": "Region Growing",
+        "parameter": "seeds>=P70 (211802 px); |I-mu_R|<=25; 8-neighborhood",
+        "iou": 0.23202683008754516,
+        "dice": 0.3766587292113725,
+        "precision": 0.6493515605569918,
+        "recall": 0.2652626443572055,
+        "accuracy": 0.349084789134838
+      },
+      {
+        "image": "02_casa_cuervo",
+        "method": "Watershed",
+        "parameter": "object markers>=P80; background markers: distance>10 px from I>83; Sobel relief; 4-neighborhood",
+        "iou": 0.2942306280211555,
+        "dice": 0.45468036631311437,
+        "precision": 0.6757900751536002,
+        "recall": 0.34258953386439,
+        "accuracy": 0.39075846354166666
+      },
+      {
+        "image": "03_sombras_tarde",
+        "method": "Otsu",
+        "parameter": "threshold=102; bins=256",
+        "iou": 0.45859022543161393,
+        "dice": 0.6288129694491977,
+        "precision": 0.7750696244221508,
+        "recall": 0.5289915667908138,
+        "accuracy": 0.6640824235807861
+      },
+      {
+        "image": "03_sombras_tarde",
+        "method": "K-means",
+        "parameter": "k=2; seed=7; max_iter=100; tolerance=1e-4; centroids=[54.04, 152.38]",
+        "iou": 0.4548391906903449,
+        "dice": 0.6252776163866143,
+        "precision": 0.7769734184617796,
+        "recall": 0.5231400765179269,
+        "accuracy": 0.6627379912663756
+      },
+      {
+        "image": "03_sombras_tarde",
+        "method": "Region Growing",
+        "parameter": "seeds>=P70 (144954 px); |I-mu_R|<=25; 8-neighborhood",
+        "iou": 0.40598813886122104,
+        "dice": 0.5775128930889144,
+        "precision": 0.8030819286908581,
+        "recall": 0.4508722434772019,
+        "accuracy": 0.645171943231441
+      },
+      {
+        "image": "03_sombras_tarde",
+        "method": "Watershed",
+        "parameter": "object markers>=P80; background markers: distance>10 px from I>102; Sobel relief; 4-neighborhood",
+        "iou": 0.4796554645183287,
+        "dice": 0.6483339885808763,
+        "precision": 0.7815082496721321,
+        "recall": 0.5539390495133907,
+        "accuracy": 0.6767740174672489
+      },
+      {
+        "image": "04_vendedor_peaton",
+        "method": "Otsu",
+        "parameter": "threshold=100; bins=256",
+        "iou": 0.418589377237692,
+        "dice": 0.5901487547478725,
+        "precision": 0.5935458719004362,
+        "recall": 0.5867903026107623,
+        "accuracy": 0.5840015223513221
+      },
+      {
+        "image": "04_vendedor_peaton",
+        "method": "K-means",
+        "parameter": "k=2; seed=7; max_iter=100; tolerance=1e-4; centroids=[41.57, 159.08]",
+        "iou": 0.418589377237692,
+        "dice": 0.5901487547478725,
+        "precision": 0.5935458719004362,
+        "recall": 0.5867903026107623,
+        "accuracy": 0.5840015223513221
+      },
+      {
+        "image": "04_vendedor_peaton",
+        "method": "Region Growing",
+        "parameter": "seeds>=P70 (210666 px); |I-mu_R|<=25; 8-neighborhood",
+        "iou": 0.34989225549803604,
+        "dice": 0.5184002709445059,
+        "precision": 0.6984029651507977,
+        "recall": 0.4121698016240107,
+        "accuracy": 0.6091219952724868
+      },
+      {
+        "image": "04_vendedor_peaton",
+        "method": "Watershed",
+        "parameter": "object markers>=P80; background markers: distance>10 px from I>100; Sobel relief; 4-neighborhood",
+        "iou": 0.3801465290379016,
+        "dice": 0.5508785060712376,
+        "precision": 0.5868165877586579,
+        "recall": 0.5190882719351508,
+        "accuracy": 0.5679905186028784
+      },
+      {
+        "image": "05_calle_candelaria",
+        "method": "Otsu",
+        "parameter": "threshold=139; bins=256",
+        "iou": 0.21669378128235267,
+        "dice": 0.3562010172419308,
+        "precision": 0.5690166179506572,
+        "recall": 0.25924270361885604,
+        "accuracy": 0.28578728840626
+      },
+      {
+        "image": "05_calle_candelaria",
+        "method": "K-means",
+        "parameter": "k=2; seed=7; max_iter=100; tolerance=1e-4; centroids=[79.72, 197.97]",
+        "iou": 0.21947596419321974,
+        "dice": 0.3599512751994592,
+        "precision": 0.5710585426067952,
+        "recall": 0.2628000968504964,
+        "accuracy": 0.28770360907058445
+      },
+      {
+        "image": "05_calle_candelaria",
+        "method": "Region Growing",
+        "parameter": "seeds>=P70 (85644 px); |I-mu_R|<=25; 8-neighborhood",
+        "iou": 0.1797638964160324,
+        "dice": 0.304745546057362,
+        "precision": 0.5344682639764607,
+        "recall": 0.21313627982343408,
+        "accuracy": 0.2588097519429362
+      },
+      {
+        "image": "05_calle_candelaria",
+        "method": "Watershed",
+        "parameter": "object markers>=P80; background markers: distance>10 px from I>139; Sobel relief; 4-neighborhood",
+        "iou": 0.194981164879745,
+        "dice": 0.32633345296177385,
+        "precision": 0.5338792091148561,
+        "recall": 0.23498351679052354,
+        "accuracy": 0.2605876716703929
+      }
+    ],
+    "confusion_matrices": {
+      "01_calle_mural": {
+        "Otsu": [
+          [
+            96077,
+            281489
+          ],
+          [
+            905485,
+            870949
+          ]
+        ],
+        "K-means": [
+          [
+            99083,
+            278483
+          ],
+          [
+            917276,
+            859158
+          ]
+        ],
+        "Region Growing": [
+          [
+            197617,
+            179949
+          ],
+          [
+            1303706,
+            472728
+          ]
+        ],
+        "Watershed": [
+          [
+            103740,
+            273826
+          ],
+          [
+            914284,
+            862150
+          ]
+        ]
+      },
+      "02_casa_cuervo": {
+        "Otsu": [
+          [
+            3246427,
+            2473848
+          ],
+          [
+            11707414,
+            4690711
+          ]
+        ],
+        "K-means": [
+          [
+            3246427,
+            2473848
+          ],
+          [
+            11707414,
+            4690711
+          ]
+        ],
+        "Region Growing": [
+          [
+            3371387,
+            2348888
+          ],
+          [
+            12048315,
+            4349810
+          ]
+        ],
+        "Watershed": [
+          [
+            3025126,
+            2695149
+          ],
+          [
+            10780299,
+            5617826
+          ]
+        ]
+      },
+      "03_sombras_tarde": {
+        "Otsu": [
+          [
+            695336,
+            151274
+          ],
+          [
+            464127,
+            521263
+          ]
+        ],
+        "K-means": [
+          [
+            698639,
+            147971
+          ],
+          [
+            469893,
+            515497
+          ]
+        ],
+        "Region Growing": [
+          [
+            737670,
+            108940
+          ],
+          [
+            541105,
+            444285
+          ]
+        ],
+        "Watershed": [
+          [
+            694004,
+            152606
+          ],
+          [
+            439544,
+            545846
+          ]
+        ]
+      },
+      "04_vendedor_peaton": {
+        "Otsu": [
+          [
+            5092185,
+            3670912
+          ],
+          [
+            3774890,
+            5360641
+          ]
+        ],
+        "K-means": [
+          [
+            5092185,
+            3670912
+          ],
+          [
+            3774890,
+            5360641
+          ]
+        ],
+        "Region Growing": [
+          [
+            7137058,
+            1626039
+          ],
+          [
+            5370141,
+            3765390
+          ]
+        ],
+        "Watershed": [
+          [
+            5424104,
+            3338993
+          ],
+          [
+            4393384,
+            4742147
+          ]
+        ]
+      },
+      "05_calle_candelaria": {
+        "Otsu": [
+          [
+            24856,
+            42170
+          ],
+          [
+            159088,
+            55676
+          ]
+        ],
+        "K-means": [
+          [
+            24632,
+            42394
+          ],
+          [
+            158324,
+            56440
+          ]
+        ],
+        "Region Growing": [
+          [
+            27156,
+            39870
+          ],
+          [
+            168990,
+            45774
+          ]
+        ],
+        "Watershed": [
+          [
+            22965,
+            44061
+          ],
+          [
+            164298,
+            50466
+          ]
+        ]
+      }
+    },
+    "mean_per_image": {
+      "Otsu": {
+        "iou": 0.35312904433008213,
+        "dice": 0.5136087134354097,
+        "precision": 0.6696174503138032,
+        "recall": 0.43027112859124533,
+        "accuracy": 0.468332654140883
+      },
+      "K-means": {
+        "iou": 0.35191150431930973,
+        "dice": 0.5126371886179475,
+        "precision": 0.670299663215205,
+        "recall": 0.42848481826579893,
+        "accuracy": 0.4676313400745613
+      },
+      "Region Growing": {
+        "iou": 0.28186095774160735,
+        "dice": 0.43330727515545375,
+        "precision": 0.6819191200777446,
+        "recall": 0.32151032313333766,
+        "accuracy": 0.4346795714966561
+      },
+      "Watershed": {
+        "iou": 0.35390428587804446,
+        "dice": 0.5144557887759031,
+        "precision": 0.6673890030055958,
+        "recall": 0.4271853186121442,
+        "accuracy": 0.468905514015026
+      }
+    },
+    "aggregate_pixel_weighted": {
+      "Otsu": {
+        "metrics": {
+          "iou": 0.327334489669025,
+          "dice": 0.49322080035853944,
+          "precision": 0.6346532657303827,
+          "recall": 0.4033371303311189,
+          "accuracy": 0.4663928166081658
+        },
+        "confusion_matrix": [
+          [
+            9154881,
+            6619693
+          ],
+          [
+            17011004,
+            11499240
+          ]
+        ]
+      },
+      "K-means": {
+        "metrics": {
+          "iou": 0.3269130902840611,
+          "dice": 0.49274227932151404,
+          "precision": 0.6345276359958013,
+          "recall": 0.4027481139761554,
+          "accuracy": 0.4661510181660902
+        },
+        "confusion_matrix": [
+          [
+            9160966,
+            6613608
+          ],
+          [
+            17027797,
+            11482447
+          ]
+        ]
+      },
+      "Region Growing": {
+        "metrics": {
+          "iou": 0.27665040426428655,
+          "dice": 0.4334004099167866,
+          "precision": 0.6783895406800031,
+          "recall": 0.31841141029869824,
+          "accuracy": 0.46401624592879664
+        },
+        "confusion_matrix": [
+          [
+            11470888,
+            4303686
+          ],
+          [
+            19432257,
+            9077987
+          ]
+        ]
+      },
+      "Watershed": {
+        "metrics": {
+          "iou": 0.33752608426834774,
+          "dice": 0.5047020588805652,
+          "precision": 0.6450029934939941,
+          "recall": 0.4145329306897549,
+          "accuracy": 0.4761987279703848
+        },
+        "confusion_matrix": [
+          [
+            9269939,
+            6504635
+          ],
+          [
+            16691809,
+            11818435
+          ]
+        ]
+      }
+    },
+    "overview_figure": "deliverables/figures/la_candelaria_overview.png"
+  }
+}
