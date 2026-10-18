@@ -41,7 +41,7 @@
       "binary_reference": "data/benchmarks/cfd5/masks/001_crack.png",
       "image_sha256": "a5f8b96500502002fe79efa35885397b75cea3d411b4c0ace552fff2ba8b66d9",
       "ground_truth_sha256": "a546942b5ca8e439054b5ca36e0a2058e7607cafc3a318d8b064cd7ff5ccd9f2",
-      "seg_sha256": "370c04668aa785300fb276d0a2e2312f55650453126866d6ccbeedc774bdc9be",
+      "seg_sha256": "17d019ccf9f58e491491091980a8c03527c8b0841eecbf787a09323052bec289",
       "binary_mask_sha256": "38e3f1ed7e08b2c245d583ce4b87672702697c8f1950e4840e20038119ea7067",
       "shape_height_width": [
         320,
@@ -65,7 +65,7 @@
       "binary_reference": "data/benchmarks/cfd5/masks/024_crack.png",
       "image_sha256": "9123a4856875b63878795aee034896563f5e1a80da90edfa1be20144242121e6",
       "ground_truth_sha256": "58cbeecf6d67d6775c633811dcfde8394269753e3ee776ce4ca4bd1b3124ee07",
-      "seg_sha256": "fbefe9d8a78bbd85b522d440a7fa8aab2312c27179ef5adba7c1682a1fefda63",
+      "seg_sha256": "1660659ec2b97d6c665d2202bde666b6442782b5238a4186e0b648e932853249",
       "binary_mask_sha256": "f740f630d038bd44323984e8475b4121e89eb58687cfabd0a5bb3ca0c235c6a4",
       "shape_height_width": [
         320,
@@ -89,7 +89,7 @@
       "binary_reference": "data/benchmarks/cfd5/masks/050_crack.png",
       "image_sha256": "ed5f85ba5fba7cb46d2ed81d37fb72b48e320240a8ee3017cc88923224ba8e8c",
       "ground_truth_sha256": "cd49a221050f742fb395208c0926e7afed41741c8159b41abe0b5d75524ec054",
-      "seg_sha256": "3fe8474094f490bce733b793704acdcb0ab185d7cef84fd741b3f917ff5aaf6f",
+      "seg_sha256": "6f8e2f562f1a0ea7ff30ac24b14229285818f8f9bd861fb2072948a678319adb",
       "binary_mask_sha256": "2198931b88a16a15cf230c9c3afe94c9ca4b41d7365a069dc5224fb21f9c9b1c",
       "shape_height_width": [
         320,
@@ -113,7 +113,7 @@
       "binary_reference": "data/benchmarks/cfd5/masks/074_crack.png",
       "image_sha256": "979f891197a1d00b15efb3002981d1258caa08374ac53d0d2afc0ab589337cf9",
       "ground_truth_sha256": "96b7326261b000cef4d127f05a189854193a2791b682379fc3f7e910b346775f",
-      "seg_sha256": "e1e5afb1b88ddea1bcda04ef5040d6c0b759a999edcd4ed1b82ebf4dcfe5b512",
+      "seg_sha256": "550281369c40df1859641b2882674f74edd28be4d18997d9c362da67ae66273d",
       "binary_mask_sha256": "c29cd5eef73681eb3df1f908d52f37b9a4f184bfbec128a7098a560de9914f34",
       "shape_height_width": [
         320,
@@ -137,7 +137,7 @@
       "binary_reference": "data/benchmarks/cfd5/masks/116_crack.png",
       "image_sha256": "e5e176cb3711f722786ff5fcbf206186ced72c4354efdeab2ebb13da3b2955c8",
       "ground_truth_sha256": "858960c197095c6f309e624ae0b4a47907972be2e06d7ca29ab43ec58911eb4a",
-      "seg_sha256": "01d825653b3d6fae7c328a4091e5f976087099a361e717041d55c3466db148dc",
+      "seg_sha256": "a50a1a3091ffba1b7172baef3b79bcfc9d39c9f78c65acc50bac6ef8497f562b",
       "binary_mask_sha256": "7c7f3cc37a1fc69742fea24387190a5eb4588572b230d9fd90412b36f012cb3a",
       "shape_height_width": [
         320,

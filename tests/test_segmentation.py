@@ -80,3 +80,45 @@ def test_labelme_exporter_converts_only_target_polygons(tmp_path):
     values = set(np.asarray(Image.open(output).convert("L")).ravel())
     assert values.issubset({0, 255})
     assert 255 in values
+
+
+def test_gaussian_blur_preserves_constant_images_and_mean():
+    from segmentation_lab.preprocessing import gaussian_blur
+    constant = np.full((9, 11), 77.0)
+    assert np.allclose(gaussian_blur(constant, 1.5), 77.0)
+    impulse = np.zeros((21, 21)); impulse[10, 10] = 1.0
+    assert np.isclose(gaussian_blur(impulse, 1.0).sum(), 1.0)
+
+
+def test_sobel_detects_vertical_edge_only_at_boundary():
+    from segmentation_lab.preprocessing import sobel_magnitude
+    image = np.zeros((5, 6)); image[:, 3:] = 100.0
+    gradient = sobel_magnitude(image)
+    assert gradient[:, 0].max() == 0 and gradient[:, 5].max() == 0
+    assert gradient[:, 2:4].min() == 400.0
+
+
+def test_region_growing_stops_at_dissimilar_pixels():
+    from segmentation_lab.region_growing import region_growing
+    image = np.array([[200, 205, 50, 210], [198, 202, 55, 207]], dtype=float)
+    seeds = np.zeros_like(image, dtype=bool); seeds[0, 0] = True
+    mask, order = region_growing(image, seeds, tolerance=10)
+    assert mask.tolist() == [[True, True, False, False], [True, True, False, False]]
+    assert order[0, 0] == 0 and order[1, 1] == 1
+
+
+def test_marker_watershed_splits_at_gradient_ridge():
+    from segmentation_lab.watershed import marker_watershed
+    gradient = np.array([[0, 1, 9, 1, 0]] * 3, dtype=float)
+    markers = np.zeros((3, 5), dtype=np.int32); markers[:, 0] = 1; markers[:, 4] = 2
+    labels, lines = marker_watershed(gradient, markers)
+    assert (labels[:, :2] == 1).all() and (labels[:, 3:] == 2).all()
+    assert lines.any()
+
+
+def test_build_markers_uses_distance_to_candidates():
+    from segmentation_lab.watershed import build_markers
+    intensity = np.zeros((1, 10)); intensity[0, 0] = 255
+    markers, distance = build_markers(intensity, candidate_threshold=128, seed_percentile=95, background_distance=4)
+    assert markers[0, 0] == 2 and distance[0, 9] == 9
+    assert (markers[0, 1:5] == 0).all() and (markers[0, 5:] == 1).all()

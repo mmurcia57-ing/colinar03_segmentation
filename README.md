@@ -1,56 +1,64 @@
 # Laboratorio UNIR: Evaluación de la segmentación
 
-Comparación reproducible de las implementaciones propias de Otsu y K-means mediante IoU, Dice, precisión, recall, exactitud y matrices de confusión.
+Comparación de cuatro segmentadores frente a *ground truth* con un evaluador propio (matriz de confusión, IoU, Dice, precisión, recall y exactitud):
 
-La Candelaria, Bogotá, es el caso de estudio principal con cinco fotografías reales. Sus máscaras de `urban_built_surface` son referencias manuales preliminares: fueron creadas independientemente de los segmentadores, pero no superaron una validación visual completa y no se presentan como *ground truth* validado.
+| Segmentador | Familia | Papel |
+|---|---|---|
+| Otsu | Umbralización global | Línea base |
+| K-means (k=2) | Agrupamiento de intensidades | Línea base |
+| Region Growing | Crecimiento de regiones por semillas (Tema 10.4) | Método principal |
+| Watershed con marcadores | Inundación morfológica (Tema 10.7) | Método principal |
 
-CrackForest Dataset (CFD) es un benchmark complementario con anotaciones oficiales. Se usan cinco pares seleccionados mediante una regla determinista y el mismo preprocesamiento fijo para ambos métodos.
+- **CrackForest Dataset (CFD)**: cinco imágenes de pavimento con anotación oficial de grietas. Es la evaluación cuantitativa principal.
+- **La Candelaria (Bogotá)**: cinco fotografías urbanas con máscaras manuales propias de `urban_built_surface`. Es una aplicación secundaria con métricas orientativas.
 
-## Estructura principal
+## Estructura
 
-- `src/segmentation_lab/`: algoritmos y métricas existentes.
-- `notebooks/evaluacion_segmentacion.ipynb`: único notebook académico, ejecutado con los dos escenarios.
-- `scripts/run_integrated_evaluation.py`: evaluación conjunta y figuras canónicas.
-- `scripts/prepare_cfd_benchmark.py`: auditoría y selección reproducible de CFD.
-- `scripts/build_integrated_notebook.py`: generación del notebook sin duplicar algoritmos.
-- `scripts/build_academic_report.py`: informe académico de seis páginas.
-- `scripts/validate_deliverables.py`: hashes CFD y coherencia JSON–notebook–PDF.
-- `scripts/export_labelme_masks.py`: conversión determinista de anotaciones LabelMe revisadas; no aprueba ground truth.
-- `docs/qg0_assisted_ground_truth.md`: decisión de viabilidad y estado QG0/QG1.
-- `data/benchmarks/cfd5/manifest.json`: procedencia, commit, licencia, etiquetas, hashes y controles.
-- `deliverables/`: resultados JSON, figuras, fuente Markdown e informe PDF.
+- `src/segmentation_lab/`: implementación propia de todo el pipeline.
+  - `metrics.py`: evaluador (matriz de confusión y métricas).
+  - `algorithms.py`: Otsu y K-means.
+  - `region_growing.py`: crecimiento de regiones por semillas.
+  - `watershed.py`: Watershed con marcadores (inundación por cola de prioridad).
+  - `preprocessing.py`: gris, gaussiano, Sobel y resta de fondo.
+  - `pipeline.py`: parámetros fijos por escenario.
+  - `visualization.py`: figuras de pasos intermedios y de errores.
+- `notebooks/evaluacion_segmentacion.ipynb`: notebook ejecutado que muestra los pasos principales de cada método y la evaluación completa.
+- `deliverables/informe_academico.pdf`: memoria (máx. 6 páginas). `results.json` contiene los resultados canónicos y `figures/` las figuras.
+- `scripts/run_integrated_evaluation.py`: evaluación completa (JSON y figuras).
+- `scripts/build_integrated_notebook.py`, `scripts/build_academic_report.py`: generan el notebook y la memoria.
+- `scripts/prepare_cfd_benchmark.py`: descarga auditada y selección determinista de CFD.
+- `scripts/validate_deliverables.py`: comprueba hashes CFD y coherencia JSON–notebook–PDF.
+- `tests/`: pruebas unitarias de métricas y segmentadores.
 
-## Reproducir en Windows con Python 3.12
+## Reproducir
 
-Desde la raíz del repositorio:
+Requiere Python 3.12. La validación final necesita `pdfinfo` y `pdftotext`: en macOS se instalan con `brew install poppler` y en Windows vienen con MiKTeX.
 
-```powershell
-py -3.12 -m venv .venv
-.\.venv\Scripts\Activate.ps1
+macOS / Linux:
+
+```bash
+python3.12 -m venv .venv && source .venv/bin/activate
 python -m pip install -r requirements.txt
 
-New-Item -ItemType Directory -Force tmp | Out-Null
+mkdir -p tmp
 git clone https://github.com/cuilimeng/CrackForest-dataset.git tmp/cfd_official
 git -C tmp/cfd_official checkout ed57c2d96754e6c7d105805cd29aeeb3a799f267
-python scripts/prepare_cfd_benchmark.py --prepare
+python scripts/prepare_cfd_benchmark.py --prepare      # o --audit si ya está preparado
 
 python scripts/run_integrated_evaluation.py
 python scripts/build_integrated_notebook.py
-$env:PYTHONPATH = "$PWD\src;$PWD"
-python -m jupyter nbconvert --execute --to notebook --inplace notebooks/evaluacion_segmentacion.ipynb --ExecutePreprocessor.kernel_name=python3 --ExecutePreprocessor.timeout=300
+export PYTHONPATH="$PWD/src:$PWD"
+python -m jupyter nbconvert --execute --to notebook --inplace notebooks/evaluacion_segmentacion.ipynb --ExecutePreprocessor.kernel_name=python3 --ExecutePreprocessor.timeout=600
 python scripts/build_academic_report.py
 python -m pytest -q
 python scripts/validate_deliverables.py
 ```
 
-Si el benchmark ya está preparado, use `python scripts/prepare_cfd_benchmark.py --audit` en lugar de `--prepare`. La validación final del PDF requiere que `pdfinfo` y `pdftotext` estén disponibles; MiKTeX los proporciona en el entorno usado para esta entrega.
+Windows (PowerShell): los mismos comandos, con estas diferencias:
+- crear el entorno con `py -3.12 -m venv .venv` y activarlo con `.\.venv\Scripts\Activate.ps1`;
+- crear la carpeta con `New-Item -ItemType Directory -Force tmp`;
+- fijar el path con `$env:PYTHONPATH = "$PWD\src;$PWD"`.
 
-## Datos, licencia y publicación
+## Datos y licencias
 
-Las fotografías de La Candelaria se atribuyen en `data/real/sources.json`. CFD declara uso exclusivo para investigación no comercial en su repositorio oficial. Por prudencia, este repositorio no redistribuye las imágenes, archivos `.mat`, `.seg` ni máscaras binarias derivadas de CFD; el manifiesto registra los hashes y los scripts permiten reconstruir la muestra desde el commit oficial.
-
-Los entornos virtuales, pesos de modelos, datos CFD crudos y experimentos asistidos pesados permanecen excluidos del control de versiones. El informe y las figuras compactas se publican como evidencia del laboratorio académico.
-
-## Estado metodológico
-
-La integridad, alineación y polaridad de las cinco parejas CFD fueron verificadas. QG1 no está aprobado porque las referencias de La Candelaria siguen siendo preliminares. Las métricas urbanas deben interpretarse como provisionales; las conclusiones cuantitativas frente a anotaciones externas corresponden al benchmark CFD.
+Las fotografías de La Candelaria se atribuyen en `data/real/sources.json`. CFD declara uso exclusivo para investigación no comercial. Por eso este repositorio no redistribuye sus imágenes ni anotaciones: el manifiesto `data/benchmarks/cfd5/manifest.json` registra commit, regla de selección y hashes, y `prepare_cfd_benchmark.py` reconstruye la muestra.

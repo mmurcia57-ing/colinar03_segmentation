@@ -25,11 +25,11 @@ EXCLUDED_NAME = "042"  # published reports identify this image/mask pair as mism
 
 
 def sha256(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as stream:
-        for block in iter(lambda: stream.read(1024 * 1024), b""):
-            digest.update(block)
-    return digest.hexdigest()
+    """SHA-256 of the file; .seg text files hash with LF line endings so Windows and Unix checkouts agree."""
+    data = path.read_bytes()
+    if path.suffix == ".seg":
+        data = data.replace(b"\r\n", b"\n")
+    return hashlib.sha256(data).hexdigest()
 
 
 def load_ground_truth(path: Path) -> np.ndarray:

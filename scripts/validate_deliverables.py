@@ -15,11 +15,11 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def sha256(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as stream:
-        for block in iter(lambda: stream.read(1024 * 1024), b""):
-            digest.update(block)
-    return digest.hexdigest()
+    """SHA-256 of the file; .seg text files hash with LF line endings so Windows and Unix checkouts agree."""
+    data = path.read_bytes()
+    if path.suffix == ".seg":
+        data = data.replace(b"\r\n", b"\n")
+    return hashlib.sha256(data).hexdigest()
 
 
 def compact(text: str) -> str:
@@ -56,7 +56,7 @@ def main() -> None:
     info = subprocess.run(["pdfinfo", str(pdf_path)], check=True, capture_output=True, text=True).stdout
     page_line = next(line for line in info.splitlines() if line.startswith("Pages:"))
     page_count = int(page_line.split(":", 1)[1].strip())
-    assert page_count == 6, f"Expected exactly six designed pages, found {page_count}."
+    assert page_count <= 6, f"La memoria supera el límite de 6 páginas: {page_count}."
     with tempfile.TemporaryDirectory() as temp_dir:
         text_path = Path(temp_dir) / "report.txt"
         subprocess.run(["pdftotext", "-layout", str(pdf_path), str(text_path)], check=True)
@@ -64,20 +64,16 @@ def main() -> None:
     compact_pdf = compact(pdf_text)
     assert compact(results["title"]) in compact_pdf, "PDF title differs from JSON title."
 
-    cfd = results["complementary_benchmark"]
+    cfd = results["cfd"]
     for row in cfd["rows"]:
         for field in ("iou", "dice", "precision", "recall"):
             assert f"{row[field]:.4f}" in pdf_text, f"Missing CFD {row['image']} {row['method']} {field}"
-        matrix = compact(str(cfd["confusion_matrices"][row["image"]][row["method"]]))
-        assert matrix in compact_pdf, f"Missing CFD matrix {row['image']} {row['method']}"
+    for method, item in cfd["aggregate_pixel_weighted"].items():
+        assert compact(str(item["confusion_matrix"])) in compact_pdf, f"Missing CFD aggregate matrix {method}"
 
-    case = results["case_study"]
-    for row in case["rows"]:
-        for field in ("iou", "dice", "precision", "recall"):
+    for row in results["la_candelaria"]["rows"]:
+        for field in ("iou", "dice"):
             assert f"{row[field]:.4f}" in pdf_text, f"Missing La Candelaria {row['image']} {row['method']} {field}"
-    for method in ("Otsu", "K-means"):
-        matrix = compact(str(case["aggregate_pixel_weighted"][method]["confusion_matrix"]))
-        assert matrix in compact_pdf, f"Missing aggregate La Candelaria matrix {method}"
 
     print("CFD_INTEGRITY=PASS")
     print("NOTEBOOK_JSON_MATCH=PASS")

@@ -1,280 +1,400 @@
-"""Build the integrated six-page academic report from computed JSON results."""
+"""Genera la memoria académica (máx. 6 páginas, PDF y Markdown) a partir de deliverables/results.json."""
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
-from xml.sax.saxutils import escape
 
+import matplotlib
+from PIL import Image as PILImage
 from reportlab.lib import colors
-from reportlab.lib.enums import TA_CENTER
+from reportlab.lib.enums import TA_CENTER, TA_JUSTIFY
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import cm
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.platypus import Image as RLImage
-from reportlab.platypus import PageBreak, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
-
+from reportlab.platypus import KeepTogether, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
 ROOT = Path(__file__).resolve().parents[1]
 OUTPUT = ROOT / "deliverables"
-TITLE = (
-    "Evaluación de métodos de segmentación en imágenes urbanas de La Candelaria, Bogotá, "
-    "con validación complementaria mediante CrackForest Dataset"
-)
+METHODS = ("Otsu", "K-means", "Region Growing", "Watershed")
+FONT_DIR = Path(matplotlib.get_data_path()) / "fonts" / "ttf"
+pdfmetrics.registerFont(TTFont("DejaVu", str(FONT_DIR / "DejaVuSans.ttf")))
+pdfmetrics.registerFont(TTFont("DejaVu-Bold", str(FONT_DIR / "DejaVuSans-Bold.ttf")))
+pdfmetrics.registerFont(TTFont("DejaVu-Oblique", str(FONT_DIR / "DejaVuSans-Oblique.ttf")))
+pdfmetrics.registerFontFamily("DejaVu", normal="DejaVu", bold="DejaVu-Bold", italic="DejaVu-Oblique", boldItalic="DejaVu-Bold")
 
 
 def fmt(value: float) -> str:
     return f"{value:.4f}"
 
 
-def p(text: str, style) -> Paragraph:
-    return Paragraph(escape(text), style)
+# --- Texto de la memoria (marcado de ReportLab: <b>, <i>, <sub>, <super>) -----------------
+
+INTRO = [
+    "La segmentación divide una imagen en regiones homogéneas que corresponden a los objetos de interés. Este "
+    "trabajo construye cuatro segmentadores y mide su rendimiento frente a imágenes de <i>ground truth</i> con un "
+    "evaluador implementado desde cero.",
+    "<b>Problema principal.</b> Detectar grietas en pavimento con el <i>CrackForest Dataset</i> (CFD; Shi et al., "
+    "2016), que aporta anotaciones humanas oficiales. Es un problema exigente: la grieta es una estructura fina, "
+    "oscura y minoritaria (1–2 % de los píxeles) sobre un asfalto muy texturizado. <b>Aplicación secundaria.</b> "
+    "Segmentar la superficie construida en cinco fotografías urbanas de La Candelaria (Bogotá) con máscaras "
+    "manuales propias.",
+    "<b>Objetivos:</b> (1) implementar dos métodos del Tema 10 —crecimiento de regiones por semillas y Watershed "
+    "con marcadores— y dos líneas base —Otsu y K-means—; (2) implementar un evaluador propio (matriz de confusión, "
+    "IoU, Dice, precisión y recall); (3) comparar los cuatro métodos sobre varias imágenes y analizar sus fallos.",
+]
+
+PREPROCESSING = (
+    "<b>2.1 Preprocesamiento común.</b> Los cuatro métodos reciben la misma entrada, con parámetros fijos para todas "
+    "las imágenes del escenario. En CFD: gris como media de R, G y B; suavizado gaussiano separable propio "
+    "(σ = 1.5) para atenuar la textura; inversión 255 − I para que la grieta sea el objeto claro; y resta de "
+    "fondo I′ = 4·(I − G<sub>15</sub>∗I) + 128, que elimina la iluminación no uniforme y realza estructuras finas. En "
+    "La Candelaria: reducción a lado máximo 1024 px (coste computacional), gris y suavizado σ = 1.5; las máscaras "
+    "se devuelven a resolución original por vecino más cercano antes de evaluar."
+)
+
+BASELINES = (
+    "<b>2.2 Líneas base.</b> <i>Otsu</i> (1979) elige el umbral t que maximiza la varianza entre clases "
+    "σ<sub>B</sub><super>2</super>(t) = [μ<sub>T</sub>·ω(t) − μ(t)]<super>2</super> / [ω(t)·(1 − ω(t))], con ω(t) y "
+    "μ(t) la probabilidad y la media acumuladas del histograma. <i>K-means</i> (MacQueen, 1967) con k = 2 sobre "
+    "intensidades alterna la asignación al centroide más cercano y la actualización de medias (inicialización "
+    "mín./máx., tolerancia 10<super>−4</super>); el grupo claro es el objeto. Ambos deciden con un único umbral "
+    "global y no usan información espacial."
+)
+
+REGION_GROWING = (
+    "<b>2.3 Crecimiento de regiones por semillas (Tema 10.4).</b> Técnica <i>bottom-up</i> de agregación local "
+    "(Adams y Bischof, 1994). Semillas: píxeles con intensidad ≥ percentil P de la entrada (CFD: P = 99.8, los "
+    "más oscuros del original). La región R crece por búsqueda en anchura con vecindad 8; la función de "
+    "pertenencia acepta un vecino p si |I(p) − μ<sub>R</sub>| ≤ T, donde μ<sub>R</sub> es la media actual de la "
+    "región, que se actualiza con cada inserción (CFD: T = 30; La Candelaria: P = 70, T = 25). El orden de entrada "
+    "de cada píxel se guarda para visualizar la evolución del crecimiento."
+)
+
+WATERSHED = (
+    "<b>2.4 Watershed con marcadores (Tema 10.7).</b> La imagen se interpreta como un relieve topográfico: la "
+    "magnitud del gradiente de Sobel √(G<sub>x</sub><super>2</super> + G<sub>y</sub><super>2</super>). Para evitar "
+    "la sobresegmentación se inunda solo desde marcadores: objeto = intensidad ≥ percentil 99.5; fondo = píxeles "
+    "a más de d = 3 px de cualquier candidato (I > umbral de Otsu), según un mapa de distancias euclídeas (La "
+    "Candelaria: percentil 80, d = 10). La inundación sigue el algoritmo de cola de prioridad de Meyer (1994): se "
+    "extrae siempre el píxel de menor nivel, que hereda la etiqueta de la cuenca que lo alcanzó; las fronteras "
+    "entre cuencas forman las líneas de división (diques)."
+)
+
+AUTHORSHIP = (
+    "<b>2.5 Autoría del código.</b> Todos los algoritmos —gaussiano, Sobel, Otsu, K-means, crecimiento de regiones, "
+    "inundación Watershed y métricas— están implementados en NumPy/Python en <i>src/segmentation_lab/</i>. Única "
+    "parte de software existente: <i>scipy.ndimage.distance_transform_edt</i> (Virtanen et al., 2020), usada para "
+    "el mapa de distancias de los marcadores de fondo."
+)
+
+METRICS = [
+    "<b>3.1 Definiciones.</b> Para una máscara predicha S y el <i>ground truth</i> GT, ambos binarios: "
+    "TP = |S ∩ GT|, FP = |S ∖ GT|, FN = |GT ∖ S| y TN = resto. Se calculan IoU = TP/(TP + FP + FN), "
+    "Dice = 2TP/(2TP + FP + FN), precisión = TP/(TP + FP), recall = TP/(TP + FN) y exactitud. La exactitud se "
+    "reporta pero no se usa para comparar: en CFD un detector que no marque nada obtendría ≈ 0.98 por el "
+    "desbalance de clases. IoU y Dice ignoran TN y miden solapamiento real con el objeto.",
+    "<b>3.2 Implementación propia.</b> <i>confusion_matrix</i> convierte ambas máscaras a booleanos y cuenta "
+    "TN, FP, FN y TP con operaciones lógicas (¬GT ∧ ¬S, ¬GT ∧ S, GT ∧ ¬S, GT ∧ S), devolviendo "
+    "[[TN, FP], [FN, TP]]; <i>binary_metrics</i> deriva las cinco métricas con protección ante denominadores nulos. "
+    "No se usa ninguna biblioteca de métricas. Pruebas unitarias verifican casos calculables a mano (p. ej. "
+    "TP = FP = FN = TN = 1 → IoU = 1/3, Dice = 0.5). Se reportan métricas por imagen, el promedio por imagen y la "
+    "matriz agregada ponderada por píxel. El notebook recalcula todo y comprueba que coincide con "
+    "<i>deliverables/results.json</i>, fuente de las tablas de esta memoria.",
+]
+
+DATA_CFD = (
+    "<b>4.1 CFD.</b> Cinco imágenes de 480×320 (IDs 001, 024, 050, 074 y 116) seleccionadas por una regla "
+    "determinista sin mirar resultados (pares completos y consistentes; posiciones equidistantes sobre los IDs "
+    "ordenados; se excluye 042 por desalineación conocida). <i>Ground truth</i>: <i>groundTruth.Segmentation</i>, "
+    "etiqueta 2 = grieta."
+)
 
 
-def page_number(canvas, doc) -> None:
-    canvas.saveState()
-    canvas.setFont("Helvetica", 8)
-    canvas.drawRightString(A4[0] - 1.2 * cm, 0.65 * cm, f"Página {doc.page} de 6")
-    canvas.restoreState()
-
-
-def _by_image(rows: list[dict]) -> dict[str, dict[str, dict]]:
-    grouped: dict[str, dict[str, dict]] = {}
-    for row in rows:
-        grouped.setdefault(row["image"], {})[row["method"]] = row
-    return grouped
-
-
-def _source_lines() -> list[str]:
-    sources = json.loads((ROOT / "data" / "real" / "sources.json").read_text(encoding="utf-8"))["images"]
+def conclusions(cfd: dict, cand: dict) -> list[str]:
+    m = cfd["mean_per_image"]
+    rg_sens = {row["tolerance"]: row for row in cfd["sensitivity"]["region_growing_tolerance"]}
+    ratio = m["Region Growing"]["dice"] / m["Otsu"]["dice"]
     return [
-        f"{item['local_file']}: {item['title']}; {item['author']}; {item['license']}; {item['source_page']}"
-        for item in sources
+        f"<b>Umbral global frente a crecimiento de regiones.</b> En CFD, Otsu y K-means alcanzan recall ≈ "
+        f"{m['Otsu']['recall']:.2f} pero precisión ≈ {m['Otsu']['precision']:.2f}: el asfalto tiene muchos píxeles "
+        "con la misma intensidad que la grieta y un umbral global no puede separarlos (rojo en la figura 2). Region "
+        "Growing y Watershed añaden conectividad espacial: parten de semillas o marcadores fiables y solo crecen por "
+        f"píxeles conectados y similares. Así multiplican el Dice por ≈ {ratio:.0f} "
+        f"(RG {fmt(m['Region Growing']['dice'])}, WS {fmt(m['Watershed']['dice'])}).",
+        "<b>Region Growing</b> es el más preciso, pero sensible a sus parámetros (tabla 3): con T = 20 crece poco "
+        f"(recall {rg_sens[20.0]['mean_recall']:.2f}), y con T = 40 se desborda hacia el asfalto (precisión "
+        f"{rg_sens[40.0]['mean_precision']:.2f}). Los tramos de grieta sin semilla o interrumpidos por un píxel más "
+        "claro quedan sin detectar (azul en 024 y 074). <b>Watershed</b> tiene mayor recall porque el gradiente "
+        "cierra tramos discontinuos, pero cada marcador de objeto que cae sobre una mancha oscura genera una cuenca "
+        "falsa (manchas rojas en 116). Acercar los marcadores de fondo (d = 3) limita ese crecimiento.",
+        "<b>La Candelaria.</b> La superficie construida no corresponde a un nivel de intensidad: el cielo es claro "
+        "y las fachadas en sombra son oscuras. Por eso los cuatro métodos rinden de forma parecida y limitada "
+        f"(Dice medio {min(v['dice'] for v in cand['mean_per_image'].values()):.2f}–"
+        f"{max(v['dice'] for v in cand['mean_per_image'].values()):.2f}). Segmentar una clase semántica requiere "
+        "color, textura o aprendizaje, no solo intensidad.",
+        "<b>Limitaciones.</b> Cinco imágenes por escenario. Los parámetros se fijaron por escenario tras un barrido "
+        "exploratorio sobre las mismas imágenes evaluadas, por lo que las cifras de RG y WS son optimistas; la "
+        "tabla 3 muestra cuánto varían. Las referencias de La Candelaria son polígonos manuales aproximados, no "
+        "anotación experta. <b>Conclusión:</b> para estructuras finas sobre fondo texturizado, los métodos de "
+        "crecimiento de regiones del Tema 10 superan claramente a la umbralización global, a costa de depender de "
+        "la colocación de semillas o marcadores.",
     ]
 
 
-def write_markdown(path: Path, manifest: dict, results: dict) -> None:
-    case = results["case_study"]
-    cfd = results["complementary_benchmark"]
-    lines = [
-        f"# {TITLE}",
-        "",
-        "**Estado metodológico:** La Candelaria es el caso de estudio principal. Sus máscaras manuales son referencias preliminares y no constituyen ground truth validado. CFD es el benchmark complementario con anotaciones oficiales. QG1 no está aprobado.",
-        "",
-        "## Objetivo",
-        "Comparar Otsu y K-means en cinco escenas urbanas reales de La Candelaria y contrastar su comportamiento, con métricas verificables, sobre cinco imágenes de CrackForest Dataset (CFD) con anotaciones oficiales.",
-        "",
-        "## Metodología",
-        "Otsu usa un histograma de 256 niveles y clasifica como foreground las intensidades mayores al umbral. K-means es una implementación 1-D propia con k=2, centroides iniciales mínimo/máximo, semilla 7, máximo 100 iteraciones y tolerancia 1e-4; el grupo de centroide mayor es foreground. Las métricas son IoU, Dice, precisión, recall y exactitud; la matriz se ordena como `[[TN, FP], [FN, TP]]`.",
-        "",
-        "En La Candelaria, ambos métodos reciben las imágenes RGB y la implementación existente usa la media aritmética de R, G y B, sin ajuste por fotografía. Las máscaras de `urban_built_surface` se elaboraron independientemente de Otsu y K-means, pero tienen errores visuales conocidos.",
-        "",
-        "En CFD, ambos métodos reciben exactamente `255 - round(mean(R,G,B))`, sin ajuste por imagen. La referencia es `groundTruth/<id>.mat`, campo `groundTruth.Segmentation`: etiqueta 1 = pavimento intacto y 2 = grieta. `seg/<id>.seg` se utiliza solo como control de integridad.",
-        "",
-        "## Resultados provisionales — La Candelaria",
-        "| Imagen | Método | IoU | Dice | Precisión | Recall | Matriz |",
-        "|---|---|---:|---:|---:|---:|---|",
-    ]
-    for row in case["rows"]:
-        matrix = case["confusion_matrices"][row["image"]][row["method"]]
-        lines.append(
-            f"| {row['image']} | {row['method']} | {fmt(row['iou'])} | {fmt(row['dice'])} | "
-            f"{fmt(row['precision'])} | {fmt(row['recall'])} | `{matrix}` |"
-        )
-    lines += ["", "## Resultados CFD — benchmark complementario", "| Imagen | Método | IoU | Dice | Precisión | Recall | Matriz |", "|---|---|---:|---:|---:|---:|---|"]
-    for row in cfd["rows"]:
-        matrix = cfd["confusion_matrices"][row["image"]][row["method"]]
-        lines.append(
-            f"| {row['image']} | {row['method']} | {fmt(row['iou'])} | {fmt(row['dice'])} | "
-            f"{fmt(row['precision'])} | {fmt(row['recall'])} | `{matrix}` |"
-        )
-    lines += [
-        "",
-        "## Trazabilidad de CFD",
-        f"Repositorio oficial: {manifest['official_repository']}",
-        f"Commit: `{manifest['official_commit']}`",
-        f"Licencia indicada por el repositorio: {manifest['license']}",
-        "Selección reproducible: pares completos con dimensiones coincidentes, etiquetas exactamente {1,2}, equivalencia `seg == groundTruth - 1`, exclusión documentada de 042 y cinco posiciones equidistantes sobre los IDs elegibles ordenados. IDs: 001, 024, 050, 074 y 116.",
-        "",
-        "## Discusión y conclusiones",
-        "En ambos escenarios Otsu y K-means producen resultados cercanos porque separan globalmente dos grupos sobre la misma representación de intensidad. Esto no demuestra equivalencia general. En La Candelaria, la intensidad no representa de forma suficiente la semántica de superficies construidas y las referencias preliminares impiden interpretar las métricas como exactitud real.",
-        "",
-        "En CFD, el recall alto coincide con la detección de gran parte de las grietas, pero la precisión, IoU y Dice bajos evidencian numerosos falsos positivos causados por textura, sombras y variación del pavimento. La segmentación global por intensidad es insuficiente para esta estructura fina y minoritaria.",
-        "",
-        "QG1 permanece pendiente por la calidad de las referencias de La Candelaria. La evaluación CFD sí dispone de anotación oficial y sus cinco pares superaron controles técnicos de integridad, alineación y polaridad.",
-        "",
-        "## Referencias",
-        "- Otsu, N. (1979). A Threshold Selection Method from Gray-Level Histograms. IEEE Transactions on Systems, Man, and Cybernetics, 9(1), 62–66. DOI: 10.1109/TSMC.1979.4310076.",
-        "- MacQueen, J. (1967). Some Methods for Classification and Analysis of Multivariate Observations. Proceedings of the Fifth Berkeley Symposium on Mathematical Statistics and Probability, 1, 281–297.",
-        "- Shi, Y., Cui, L., Qi, Z., Meng, F., & Chen, Z. (2016). Automatic road crack detection using random structured forests. IEEE Transactions on Intelligent Transportation Systems, 17(12), 3434–3445.",
-        f"- CrackForest Dataset: {manifest['official_repository']}, commit `{manifest['official_commit']}`; licencia de uso no comercial para investigación.",
-        "",
-        "### Fuentes de las fotografías de La Candelaria",
-    ]
-    lines.extend(f"- {line}" for line in _source_lines())
+REFERENCES = [
+    "Adams, R., &amp; Bischof, L. (1994). Seeded region growing. <i>IEEE TPAMI</i>, 16(6), 641–647.",
+    "Beucher, S., &amp; Meyer, F. (1993). The morphological approach to segmentation: the watershed transformation. "
+    "En <i>Mathematical Morphology in Image Processing</i> (pp. 433–481). Marcel Dekker.",
+    "Gonzalez, R. C., &amp; Woods, R. E. (2018). <i>Digital Image Processing</i> (4.ª ed.). Pearson.",
+    "MacQueen, J. (1967). Some methods for classification and analysis of multivariate observations. "
+    "<i>Proc. 5th Berkeley Symposium</i>, 1, 281–297.",
+    "Meyer, F. (1994). Topographic distance and watershed lines. <i>Signal Processing</i>, 38(1), 113–125.",
+    "Otsu, N. (1979). A threshold selection method from gray-level histograms. <i>IEEE TSMC</i>, 9(1), 62–66.",
+    "Shi, Y., Cui, L., Qi, Z., Meng, F., &amp; Chen, Z. (2016). Automatic road crack detection using random "
+    "structured forests. <i>IEEE T-ITS</i>, 17(12), 3434–3445. Datos: github.com/cuilimeng/CrackForest-dataset "
+    "(uso no comercial para investigación).",
+    "UNIR. <i>Percepción Computacional</i>, Tema 10: Crecimiento de regiones.",
+    "Virtanen, P., et al. (2020). SciPy 1.0: fundamental algorithms for scientific computing in Python. "
+    "<i>Nature Methods</i>, 17, 261–272.",
+    "Fotografías de La Candelaria (Wikimedia Commons): P. Szekely (CC BY-SA 2.0); Instituto Caro y Cuervo / "
+    "J. A. Rodríguez Suárez (CC BY-SA 4.0); A. Segré (CC BY-SA 3.0); F. Restrepo Acosta (CC BY-SA 4.0); "
+    "Tequendamia (dominio público). Enlaces en <i>data/real/sources.json</i>.",
+]
+
+
+# --- Markdown ---------------------------------------------------------------------------
+
+def to_markdown(text: str) -> str:
+    text = re.sub(r"</?b>", "**", text)
+    text = re.sub(r"</?i>", "*", text)
+    text = re.sub(r"<sub>(.*?)</sub>", r"_\1", text)
+    text = re.sub(r"<super>(.*?)</super>", r"^\1", text)
+    return text.replace("&amp;", "&")
+
+
+def metric_rows(rows: list[dict]) -> list[list[str]]:
+    return [[r["image"], r["method"], fmt(r["iou"]), fmt(r["dice"]), fmt(r["precision"]), fmt(r["recall"])] for r in rows]
+
+
+def write_markdown(path: Path, results: dict) -> None:
+    cfd, cand = results["cfd"], results["la_candelaria"]
+    lines = [f"# {results['title']}", "", "## 1. Introducción y objetivos", ""]
+    lines += [to_markdown(t) + "\n" for t in INTRO]
+    lines += ["## 2. Métodos de segmentación", ""]
+    lines += [to_markdown(t) + "\n" for t in (PREPROCESSING, BASELINES, REGION_GROWING, WATERSHED, AUTHORSHIP)]
+    lines += ["## 3. Métricas de evaluación e implementación", ""]
+    lines += [to_markdown(t) + "\n" for t in METRICS]
+    lines += ["## 4. Resultados experimentales", "", to_markdown(DATA_CFD), ""]
+    lines += ["| Imagen | Método | IoU | Dice | Precisión | Recall |", "|---|---|---:|---:|---:|---:|"]
+    lines += ["| " + " | ".join(row) + " |" for row in metric_rows(cfd["rows"])]
+    lines += ["", "| Método (CFD) | IoU medio | Dice medio | Precisión | Recall | Matriz agregada [[TN,FP],[FN,TP]] |", "|---|---:|---:|---:|---:|---|"]
+    for method in METHODS:
+        mean = cfd["mean_per_image"][method]
+        matrix = cfd["aggregate_pixel_weighted"][method]["confusion_matrix"]
+        lines.append(f"| {method} | {fmt(mean['iou'])} | {fmt(mean['dice'])} | {fmt(mean['precision'])} | {fmt(mean['recall'])} | `{matrix}` |")
+    lines += ["", "![CFD](figures/cfd_overview.png)", "", "![Pasos](figures/cfd_pasos.png)", ""]
+    lines += ["### La Candelaria (métricas orientativas)", "", "| Imagen | Método | IoU | Dice | Precisión | Recall |", "|---|---|---:|---:|---:|---:|"]
+    lines += ["| " + " | ".join(row) + " |" for row in metric_rows(cand["rows"])]
+    lines += ["", "![La Candelaria](figures/la_candelaria_overview.png)", "", "## 5. Conclusiones", ""]
+    lines += [to_markdown(t) + "\n" for t in conclusions(cfd, cand)]
+    lines += ["## Referencias", ""] + [f"- {to_markdown(r)}" for r in REFERENCES]
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
-def _table_style(font_size: float = 6.6) -> TableStyle:
+# --- PDF --------------------------------------------------------------------------------
+
+def _table_style(font_size: float = 7.2) -> TableStyle:
     return TableStyle(
         [
-            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#24445c")),
+            ("FONTNAME", (0, 0), (-1, -1), "DejaVu"),
+            ("FONTNAME", (0, 0), (-1, 0), "DejaVu-Bold"),
+            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#0098cd")),
             ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
             ("GRID", (0, 0), (-1, -1), 0.25, colors.HexColor("#8a969c")),
             ("FONTSIZE", (0, 0), (-1, -1), font_size),
-            ("ALIGN", (1, 1), (-1, -1), "RIGHT"),
+            ("ALIGN", (2, 1), (-1, -1), "RIGHT"),
             ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-            ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#edf3f7")]),
-            ("TOPPADDING", (0, 0), (-1, -1), 2.6),
-            ("BOTTOMPADDING", (0, 0), (-1, -1), 2.6),
+            ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#eaf5fa")]),
+            ("TOPPADDING", (0, 0), (-1, -1), 1.6),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 1.6),
         ]
     )
 
 
-def build_pdf(path: Path, manifest: dict, results: dict) -> None:
-    styles = getSampleStyleSheet()
-    styles.add(ParagraphStyle(name="MainTitle", parent=styles["Title"], alignment=TA_CENTER, fontSize=18, leading=22, spaceAfter=13))
-    styles.add(ParagraphStyle(name="SectionX", parent=styles["Heading2"], fontSize=12.3, leading=14, spaceBefore=3, spaceAfter=5, textColor=colors.HexColor("#173b51")))
-    styles.add(ParagraphStyle(name="SmallX", parent=styles["BodyText"], fontSize=7.5, leading=8.8))
-    styles.add(ParagraphStyle(name="TinyX", parent=styles["BodyText"], fontSize=6.3, leading=7.3))
-    body = styles["BodyText"]
-    doc = SimpleDocTemplate(str(path), pagesize=A4, rightMargin=1.15 * cm, leftMargin=1.15 * cm, topMargin=1.0 * cm, bottomMargin=1.1 * cm)
-    story: list = []
-    case = results["case_study"]
-    cfd = results["complementary_benchmark"]
+def _figure(path: Path, width_cm: float) -> RLImage:
+    with PILImage.open(path) as image:
+        ratio = image.size[1] / image.size[0]
+    return RLImage(str(path), width=width_cm * cm, height=width_cm * ratio * cm)
 
-    story += [
-        p(TITLE, styles["MainTitle"]),
-        p("Laboratorio de Percepción Computacional — UNIR", styles["Heading2"]),
-        Spacer(1, 8),
-        p("Planteamiento", styles["SectionX"]),
-        p("La Candelaria, Bogotá, constituye el caso de estudio principal: cinco fotografías reales permiten observar cómo dos segmentadores clásicos responden a escenas urbanas con fachadas, cubiertas, pavimento, vegetación, cielo, personas y vehículos. Se comparan las implementaciones existentes de Otsu y K-means sin modificarlas.", body),
-        Spacer(1, 8),
-        p("Objetivo", styles["SectionX"]),
-        p("Comparar visual y cuantitativamente Otsu y K-means en La Candelaria, y complementar el análisis con cinco imágenes de CrackForest Dataset (CFD), cuya anotación oficial permite una evaluación externa y verificable.", body),
-        Spacer(1, 8),
-        p("Transparencia metodológica", styles["SectionX"]),
-        p("Las máscaras manuales de La Candelaria se elaboraron independientemente de Otsu y K-means, pero contienen errores visuales importantes y no superaron una validación completa. Sus métricas son provisionales y no equivalen a exactitud semántica real. CFD no reemplaza el caso urbano: funciona como benchmark complementario con ground truth oficial.", body),
-        Spacer(1, 8),
-        p("Estado", styles["SectionX"]),
-        p("La integración, la ejecución reproducible y la verificación técnica de CFD se documentan en este informe. QG1 no se declara aprobado porque la referencia semántica de La Candelaria sigue pendiente de validación.", body),
-        PageBreak(),
+
+def _header() -> Table:
+    blue = colors.HexColor("#0098cd")
+    data = [
+        ["Asignatura", "Datos del alumno", "", "Fecha"],
+        ["Percepción\nComputacional", "Apellidos:", "", ""],
+        ["", "Nombre:", "", ""],
     ]
+    table = Table(data, colWidths=[4.2 * cm, 3.0 * cm, 6.0 * cm, 4.0 * cm])
+    table.setStyle(
+        TableStyle(
+            [
+                ("FONTNAME", (0, 0), (-1, -1), "DejaVu"),
+                ("FONTNAME", (0, 1), (0, 1), "DejaVu-Bold"),
+                ("FONTSIZE", (0, 0), (-1, -1), 8),
+                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#d9eff7")),
+                ("TEXTCOLOR", (0, 0), (-1, 0), blue),
+                ("SPAN", (1, 0), (2, 0)),
+                ("SPAN", (0, 1), (0, 2)),
+                ("SPAN", (3, 1), (3, 2)),
+                ("SPAN", (1, 1), (2, 1)),
+                ("SPAN", (1, 2), (2, 2)),
+                ("ALIGN", (0, 0), (-1, 0), "CENTER"),
+                ("ALIGN", (0, 1), (0, 2), "CENTER"),
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                ("LINEABOVE", (0, 0), (-1, 0), 0.8, blue),
+                ("LINEBELOW", (0, 0), (-1, 0), 0.8, blue),
+                ("LINEBELOW", (1, 1), (2, 1), 0.5, blue),
+                ("LINEBELOW", (0, 2), (-1, 2), 0.8, blue),
+                ("LINEBEFORE", (1, 0), (1, 2), 0.5, blue),
+                ("LINEBEFORE", (3, 0), (3, 2), 0.5, blue),
+            ]
+        )
+    )
+    return table
 
-    story += [
-        p("Datos, implementación y métricas", styles["SectionX"]),
-        p("Caso principal — La Candelaria", styles["SectionX"]),
-        p("Se usan cinco fotografías reales obtenidas de Wikimedia Commons y la clase urban_built_surface: fachadas, cubiertas, balcones, puertas, ventanas y pavimento. Se excluyen cielo, vegetación, personas y vehículos. Las referencias manuales son preliminares. La conversión de RGB es la media aritmética de sus tres canales, aplicada internamente por el código existente, sin parámetros por fotografía.", body),
-        Spacer(1, 6),
-        p("Benchmark complementario — CFD", styles["SectionX"]),
-        p(f"Fuente oficial: {manifest['official_repository']}; commit {manifest['official_commit']}. Licencia declarada: {manifest['license']}", body),
-        p("La referencia procede de groundTruth/<id>.mat, campo groundTruth.Segmentation: 1 = pavimento intacto/background y 2 = grieta/foreground. El archivo seg/<id>.seg reconstruye groundTruth - 1 y se usa solo como control de integridad. Los IDs 001, 024, 050, 074 y 116 se eligieron por una regla determinista, sin observar predicciones ni métricas.", body),
-        Spacer(1, 6),
-        p("Parámetros comunes y específicos", styles["SectionX"]),
-        p("Otsu: histograma de 256 niveles; se maximiza la varianza entre clases y foreground corresponde a intensidad mayor que el umbral. K-means: k=2, datos 1-D, centroides iniciales mínimo/máximo, semilla 7, máximo 100 iteraciones, tolerancia 1e-4 y foreground en el centroide mayor. En CFD se aplica a ambos, de forma fija, entrada = 255 - round(mean(R,G,B)); no hay ajuste por imagen. En La Candelaria no se invierte la intensidad.", body),
-        Spacer(1, 6),
-        p("Evaluación", styles["SectionX"]),
-        p("Se calculan IoU, Dice, precisión, recall y exactitud. Las matrices usan el orden [[TN, FP], [FN, TP]]. Los mapas de error distinguen FP en rojo, FN en azul y TP en verde. Las predicciones de Otsu y K-means nunca construyen las referencias.", body),
-        PageBreak(),
-    ]
 
-    case_grouped = _by_image(case["rows"])
-    case_data = [["Imagen", "O IoU", "O Dice", "O Prec.", "O Rec.", "K IoU", "K Dice", "K Prec.", "K Rec."]]
-    for image_id, methods in case_grouped.items():
-        o, k = methods["Otsu"], methods["K-means"]
-        case_data.append([image_id[:14], fmt(o["iou"]), fmt(o["dice"]), fmt(o["precision"]), fmt(o["recall"]), fmt(k["iou"]), fmt(k["dice"]), fmt(k["precision"]), fmt(k["recall"])])
-    case_table = Table(case_data, colWidths=[3.15 * cm] + [1.63 * cm] * 8, repeatRows=1)
-    case_table.setStyle(_table_style(5.9))
-    aggregate_case = case["aggregate_pixel_weighted"]
-    case_matrix_data = [["Método", "Matriz agregada [[TN,FP],[FN,TP]]", "IoU", "Dice", "Precisión", "Recall"]]
-    for method in ("Otsu", "K-means"):
-        item = aggregate_case[method]
-        case_matrix_data.append([method, str(item["confusion_matrix"]), fmt(item["metrics"]["iou"]), fmt(item["metrics"]["dice"]), fmt(item["metrics"]["precision"]), fmt(item["metrics"]["recall"])])
-    case_matrix_table = Table(case_matrix_data, colWidths=[1.8 * cm, 6.2 * cm, 1.7 * cm, 1.7 * cm, 1.9 * cm, 1.7 * cm])
-    case_matrix_table.setStyle(_table_style(6.0))
-    story += [
-        p("Resultados — La Candelaria (caso principal)", styles["SectionX"]),
-        p("O = Otsu; K = K-means. Estos valores comparan contra referencias preliminares y solo describen el experimento.", styles["SmallX"]),
-        case_table,
-        Spacer(1, 4),
-        case_matrix_table,
-        Spacer(1, 5),
-        RLImage(str(ROOT / case["overview_figure"]), width=17.6 * cm, height=12.5 * cm),
-        p("La similitud visual entre ambos métodos proviene de una partición global en dos grupos de la misma intensidad; no equivale a reconocimiento semántico de superficies construidas.", styles["SmallX"]),
-        PageBreak(),
-    ]
+def page_number(canvas, doc) -> None:
+    canvas.saveState()
+    canvas.setFont("DejaVu", 7.5)
+    canvas.drawRightString(A4[0] - 1.6 * cm, 0.8 * cm, f"Página {doc.page}")
+    canvas.restoreState()
 
-    metric_data = [["Imagen", "Método", "IoU", "Dice", "Precisión", "Recall"]]
+
+def build_pdf(path: Path, results: dict) -> None:
+    cfd, cand = results["cfd"], results["la_candelaria"]
+    base = getSampleStyleSheet()
+    body = ParagraphStyle("Body", parent=base["BodyText"], fontName="DejaVu", fontSize=8.6, leading=11.2, alignment=TA_JUSTIFY, spaceAfter=3.5)
+    small = ParagraphStyle("Small", parent=body, fontSize=7.3, leading=9.0, spaceAfter=2)
+    caption = ParagraphStyle("Caption", parent=small, fontName="DejaVu-Oblique", alignment=TA_CENTER, spaceAfter=5)
+    title = ParagraphStyle("TitleX", parent=base["Title"], fontName="DejaVu", fontSize=15, leading=19, textColor=colors.HexColor("#0098cd"), spaceBefore=8, spaceAfter=8)
+    h1 = ParagraphStyle("H1", parent=base["Heading2"], fontName="DejaVu-Bold", fontSize=11, leading=13.5, spaceBefore=5, spaceAfter=3, textColor=colors.HexColor("#0b4f6c"))
+    doc = SimpleDocTemplate(str(path), pagesize=A4, leftMargin=1.9 * cm, rightMargin=1.9 * cm, topMargin=1.4 * cm, bottomMargin=1.5 * cm, title=results["title"])
+
+    story: list = [_header(), Paragraph(results["title"], title)]
+    story.append(Paragraph("1. Introducción y objetivos", h1))
+    story += [Paragraph(text, body) for text in INTRO]
+    story.append(Paragraph("2. Métodos de segmentación", h1))
+    story += [Paragraph(text, body) for text in (PREPROCESSING, BASELINES, REGION_GROWING, WATERSHED, AUTHORSHIP)]
+    story.append(Paragraph("3. Métricas de evaluación e implementación del evaluador", h1))
+    story += [Paragraph(text, body) for text in METRICS]
+
+    story.append(Paragraph("4. Resultados experimentales y comparativa", h1))
+    story.append(Paragraph(DATA_CFD, body))
+    grouped: dict[str, dict[str, dict]] = {}
     for row in cfd["rows"]:
-        metric_data.append([row["image"], row["method"], fmt(row["iou"]), fmt(row["dice"]), fmt(row["precision"]), fmt(row["recall"])])
-    metric_table = Table(metric_data, colWidths=[2.2 * cm, 2.2 * cm, 2.2 * cm, 2.2 * cm, 2.5 * cm, 2.2 * cm], repeatRows=1)
-    metric_table.setStyle(_table_style(6.6))
-    matrix_data = [["Imagen", "Otsu [[TN,FP],[FN,TP]]", "K-means [[TN,FP],[FN,TP]]"]]
-    for identifier, methods in cfd["confusion_matrices"].items():
-        matrix_data.append([identifier, str(methods["Otsu"]), str(methods["K-means"])])
-    matrix_table = Table(matrix_data, colWidths=[2.1 * cm, 7.0 * cm, 7.0 * cm], repeatRows=1)
-    matrix_table.setStyle(_table_style(6.0))
-    aggregate_cfd = cfd["aggregate_pixel_weighted"]
-    aggregate_data = [["Método", "IoU", "Dice", "Precisión", "Recall", "Matriz agregada"]]
-    for method in ("Otsu", "K-means"):
-        item = aggregate_cfd[method]
-        aggregate_data.append([method, fmt(item["metrics"]["iou"]), fmt(item["metrics"]["dice"]), fmt(item["metrics"]["precision"]), fmt(item["metrics"]["recall"]), str(item["confusion_matrix"])])
-    aggregate_table = Table(aggregate_data, colWidths=[2.0 * cm, 1.6 * cm, 1.6 * cm, 2.0 * cm, 1.7 * cm, 7.0 * cm])
-    aggregate_table.setStyle(_table_style(6.2))
-    story += [
-        p("Resultados — CFD (benchmark complementario)", styles["SectionX"]),
-        p("Las cinco referencias son anotaciones oficiales independientes; el mismo preprocesamiento y los mismos parámetros se aplican a todas las imágenes.", styles["SmallX"]),
-        Spacer(1, 4), metric_table, Spacer(1, 7),
-        p("Matrices de confusión por imagen", styles["SectionX"]), matrix_table, Spacer(1, 7),
-        p("Agregado ponderado por píxel", styles["SectionX"]), aggregate_table, Spacer(1, 8),
-        p("El recall agregado es alto, pero la precisión es muy baja. La gran cantidad de FP muestra que textura, sombra y cambios de pavimento se confunden con grietas.", body),
-        PageBreak(),
-    ]
+        grouped.setdefault(row["image"], {})[row["method"]] = row
+    header = ["Imagen"] + [f"{abbr} {metric}" for abbr in ("Otsu", "K-m", "RG", "WS") for metric in ("IoU", "Dice")]
+    per_image = [header]
+    for image_id, methods in grouped.items():
+        per_image.append([image_id] + [fmt(methods[m][f]) for m in METHODS for f in ("iou", "dice")])
+    table1 = Table(per_image, colWidths=[1.5 * cm] + [1.95 * cm] * 8)
+    table1.setStyle(_table_style(7.0))
+    story += [Paragraph("Tabla 1. CFD: IoU y Dice por imagen (RG = Region Growing; WS = Watershed).", caption), table1, Spacer(1, 4)]
+
+    pr_header = ["Imagen"] + [f"{abbr} {metric}" for abbr in ("Otsu", "K-m", "RG", "WS") for metric in ("Prec.", "Rec.")]
+    per_image_pr = [pr_header]
+    for image_id, methods in grouped.items():
+        per_image_pr.append([image_id] + [fmt(methods[m][f]) for m in METHODS for f in ("precision", "recall")])
+    table1b = Table(per_image_pr, colWidths=[1.5 * cm] + [1.95 * cm] * 8)
+    table1b.setStyle(_table_style(7.0))
+    story += [Paragraph("Tabla 1b. CFD: precisión y recall por imagen.", caption), table1b, Spacer(1, 4)]
+
+    summary = [["Método", "IoU", "Dice", "Precisión", "Recall", "Matriz agregada [[TN, FP], [FN, TP]]"]]
+    for method in METHODS:
+        mean = cfd["mean_per_image"][method]
+        summary.append([method, fmt(mean["iou"]), fmt(mean["dice"]), fmt(mean["precision"]), fmt(mean["recall"]), str(cfd["aggregate_pixel_weighted"][method]["confusion_matrix"])])
+    table2 = Table(summary, colWidths=[2.6 * cm, 1.6 * cm, 1.6 * cm, 1.8 * cm, 1.6 * cm, 8.0 * cm])
+    table2.setStyle(_table_style(7.0))
+    story += [KeepTogether([Paragraph("Tabla 2. CFD: métricas promediadas por imagen y matriz de confusión agregada por píxel.", caption), table2]), Spacer(1, 5)]
 
     story += [
-        p("Evidencia visual y Quality Gate de CFD", styles["SectionX"]),
-        RLImage(str(ROOT / cfd["overview_figure"]), width=17.6 * cm, height=12.5 * cm),
-        Spacer(1, 5),
-        p("Lectura: la referencia oficial marca la grieta en blanco; en los mapas de error FP = rojo, FN = azul y TP = verde. El predominio del rojo explica la baja precisión de ambos métodos.", body),
-        Spacer(1, 6),
-        p("Verificaciones realizadas", styles["SectionX"]),
-        p("Los cinco pares tienen dimensiones coincidentes; sus hashes están registrados; las etiquetas son exactamente {1,2}; cada archivo .seg coincide con groundTruth - 1; la imagen y la máscara fueron revisadas visualmente para confirmar alineación y polaridad de grieta como foreground. No se detectó un par que exigiera sustitución.", body),
-        Spacer(1, 6),
-        p("Alcance de la validación", styles["SectionX"]),
-        p("La inspección técnica valida los cinco pares CFD seleccionados para este benchmark complementario. No valida las máscaras preliminares de La Candelaria y, por tanto, no modifica el estado pendiente de QG1.", body),
-        PageBreak(),
+        KeepTogether([
+            _figure(ROOT / cfd["steps_figure"], 17.2),
+            Paragraph("Figura 1. Pasos intermedios sobre CFD 001: entrada común; semillas y orden de crecimiento de Region Growing; gradiente, mapa de distancias, marcadores y líneas de cuenca de Watershed.", caption),
+        ]),
+        KeepTogether([
+            _figure(ROOT / cfd["overview_figure"], 17.2),
+            Paragraph("Figura 2. CFD: imagen, <i>ground truth</i> y mapa de errores de cada método (rojo = FP, azul = FN, verde = TP).", caption),
+        ]),
     ]
 
-    co = aggregate_cfd["Otsu"]["metrics"]
-    ck = aggregate_cfd["K-means"]["metrics"]
+    sens = [["RG: T", "IoU", "Dice", "Prec.", "Recall", "", "WS: d (px)", "IoU", "Dice", "Prec.", "Recall"]]
+    rg_rows = cfd["sensitivity"]["region_growing_tolerance"]
+    ws_rows = cfd["sensitivity"]["watershed_background_distance"]
+    for index in range(max(len(rg_rows), len(ws_rows))):
+        line = []
+        if index < len(rg_rows):
+            r = rg_rows[index]
+            line += [f"{r['tolerance']:g}", fmt(r["mean_iou"]), fmt(r["mean_dice"]), fmt(r["mean_precision"]), fmt(r["mean_recall"])]
+        else:
+            line += [""] * 5
+        line.append("")
+        if index < len(ws_rows):
+            w = ws_rows[index]
+            line += [f"{w['background_distance']:g}", fmt(w["mean_iou"]), fmt(w["mean_dice"]), fmt(w["mean_precision"]), fmt(w["mean_recall"])]
+        else:
+            line += [""] * 5
+        sens.append(line)
+    table3 = Table(sens, colWidths=[2.4 * cm, 1.3 * cm, 1.3 * cm, 1.3 * cm, 1.3 * cm, 0.4 * cm, 2.4 * cm, 1.3 * cm, 1.3 * cm, 1.3 * cm, 1.3 * cm])
+    style3 = _table_style(7.0)
+    style3.add("BACKGROUND", (5, 0), (5, -1), colors.white)
+    style3.add("LINEBEFORE", (5, 0), (5, -1), 0, colors.white)
+    table3.setStyle(style3)
+    story += [KeepTogether([Paragraph("Tabla 3. CFD: sensibilidad (promedio por imagen) a la tolerancia T de Region Growing y a la distancia d de los marcadores de fondo de Watershed.", caption), table3]), Spacer(1, 5)]
+
+    cand_grouped: dict[str, dict[str, dict]] = {}
+    for row in cand["rows"]:
+        cand_grouped.setdefault(row["image"], {})[row["method"]] = row
+    cand_table = [header]
+    for image_id, methods in cand_grouped.items():
+        cand_table.append([image_id.split("_", 1)[0]] + [fmt(methods[m][f]) for m in METHODS for f in ("iou", "dice")])
+    cand_table.append(["Media"] + [fmt(cand["mean_per_image"][m][f]) for m in METHODS for f in ("iou", "dice")])
+    table4 = Table(cand_table, colWidths=[1.5 * cm] + [1.95 * cm] * 8)
+    style4 = _table_style(7.0)
+    style4.add("FONTNAME", (0, -1), (-1, -1), "DejaVu-Bold")
+    table4.setStyle(style4)
     story += [
-        p("Discusión, conclusiones y limitaciones", styles["SectionX"]),
-        p("Hallazgos conjuntos", styles["SectionX"]),
-        p(f"En CFD, Otsu obtuvo IoU {fmt(co['iou'])}, Dice {fmt(co['dice'])}, precisión {fmt(co['precision'])} y recall {fmt(co['recall'])}; K-means obtuvo IoU {fmt(ck['iou'])}, Dice {fmt(ck['dice'])}, precisión {fmt(ck['precision'])} y recall {fmt(ck['recall'])}. Los resultados son próximos porque ambos separan globalmente dos grupos sobre la misma intensidad invertida. Esta observación se limita a las muestras y parámetros ensayados.", body),
-        Spacer(1, 5),
-        p("En las escenas de La Candelaria, la iluminación, sombras, color y diversidad semántica hacen que una partición binaria de intensidad no represente directamente urban_built_surface. Las máscaras preliminares permiten conservar y analizar el experimento, pero sus errores impiden usar sus métricas como estimación de exactitud semántica real.", body),
-        Spacer(1, 5),
-        p("Conclusión técnica", styles["SectionX"]),
-        p("Otsu y K-means son reproducibles y útiles como líneas base, pero resultan insuficientes para los dos tipos de estructura evaluados: una clase urbana semántica heterogénea y grietas finas sobre pavimento texturizado. CFD satisface la comparación cuantitativa frente a anotaciones externas; La Candelaria sigue siendo el núcleo visual y metodológico del laboratorio, con la limitación explícita de sus referencias.", body),
-        Spacer(1, 5),
-        p("Referencias", styles["SectionX"]),
-        p("Otsu, N. (1979). A Threshold Selection Method from Gray-Level Histograms. IEEE TSMC, 9(1), 62–66. DOI 10.1109/TSMC.1979.4310076. MacQueen, J. (1967). Some Methods for Classification and Analysis of Multivariate Observations. Fifth Berkeley Symposium, 1, 281–297.", styles["SmallX"]),
-        p("Shi, Y., Cui, L., Qi, Z., Meng, F., & Chen, Z. (2016). Automatic road crack detection using random structured forests. IEEE T-ITS, 17(12), 3434–3445. CrackForest Dataset: repositorio y commit indicados en el manifiesto; licencia de uso no comercial para investigación.", styles["SmallX"]),
-        p("Fotografías de La Candelaria: Pedro Szekely (CC BY-SA 2.0); Instituto Caro y Cuervo/Juan Andrés Rodríguez Suárez (CC BY-SA 4.0); Amel Segré (CC BY-SA 3.0); Felipe Restrepo Acosta (CC BY-SA 4.0); Tequendamia (dominio público). URLs completas: data/real/sources.json.", styles["TinyX"]),
-        Spacer(1, 5),
-        p("Estado final", styles["SectionX"]),
-        p("La ejecución, las pruebas y la coherencia entre JSON, notebook y PDF se verifican técnicamente. QG1 no se declara aprobado y el trabajo no se presenta como validación académica definitiva de la clase urbana mientras las máscaras de La Candelaria sigan siendo preliminares.", body),
+        Paragraph(
+            "<b>4.2 La Candelaria (métricas orientativas).</b> Cinco fotografías urbanas; la referencia "
+            "<i>urban_built_surface</i> (fachadas, cubiertas y pavimento) son polígonos manuales propios trazados sin "
+            "usar los segmentadores. Al ser contornos aproximados, las métricas solo "
+            "sirven para comparar métodos entre sí.",
+            body,
+        ),
+        KeepTogether([Paragraph("Tabla 4. La Candelaria: IoU y Dice por imagen (01–05) y media.", caption), table4]),
+        Spacer(1, 4),
+        KeepTogether([
+            _figure(ROOT / cand["overview_figure"], 13.5),
+            Paragraph("Figura 3. La Candelaria: referencia manual y mapas de error de los cuatro métodos.", caption),
+        ]),
     ]
+
+    story.append(Paragraph("5. Conclusiones", h1))
+    story += [Paragraph(text, body) for text in conclusions(cfd, cand)]
+    story.append(Paragraph("Referencias", h1))
+    story += [Paragraph(text, small) for text in REFERENCES]
     doc.build(story, onFirstPage=page_number, onLaterPages=page_number)
 
 
 def main() -> None:
     OUTPUT.mkdir(exist_ok=True)
     results = json.loads((OUTPUT / "results.json").read_text(encoding="utf-8"))
-    manifest = json.loads((ROOT / "data" / "benchmarks" / "cfd5" / "manifest.json").read_text(encoding="utf-8"))
-    if results["complementary_benchmark"]["benchmark_manifest"] != "data/benchmarks/cfd5/manifest.json":
-        raise ValueError("Integrated results do not reference the expected CFD manifest.")
-    write_markdown(OUTPUT / "informe_academico.md", manifest, results)
-    build_pdf(OUTPUT / "informe_academico.pdf", manifest, results)
+    write_markdown(OUTPUT / "informe_academico.md", results)
+    build_pdf(OUTPUT / "informe_academico.pdf", results)
     print(OUTPUT / "informe_academico.pdf")
 
 

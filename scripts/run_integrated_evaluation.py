@@ -1,14 +1,13 @@
-"""Run the single academic evaluation for La Candelaria and CFD.
+"""Evaluación canónica de los cuatro segmentadores sobre CFD (principal) y La Candelaria (secundario).
 
-The existing Otsu, K-means and metric implementations are imported unchanged.
-La Candelaria remains the main case study, with preliminary references. CFD is a
-complementary benchmark with external official annotations.
+Otsu y K-means son líneas base; Region Growing y Watershed con marcadores son los
+métodos del Tema 10. Las métricas se calculan con el evaluador propio de
+segmentation_lab.metrics. El notebook y el informe consumen deliverables/results.json.
 """
 from __future__ import annotations
 
 import json
 import sys
-from datetime import date
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -18,228 +17,269 @@ from PIL import Image
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
-from segmentation_lab import binary_metrics, confusion_matrix, kmeans_segment, otsu_threshold  # noqa: E402
+from segmentation_lab import binary_metrics, confusion_matrix, otsu_threshold  # noqa: E402
+from segmentation_lab.pipeline import (  # noqa: E402
+    CANDELARIA_PARAMS,
+    CFD_PARAMS,
+    METHODS,
+    preprocess_candelaria,
+    preprocess_cfd,
+    run_methods,
+    upscale_mask,
+)
+from segmentation_lab.region_growing import region_growing, select_seeds  # noqa: E402
+from segmentation_lab.preprocessing import sobel_magnitude  # noqa: E402
+from segmentation_lab.watershed import FOREGROUND, build_markers, marker_watershed  # noqa: E402
+from segmentation_lab import visualization  # noqa: E402
 
-
+TITLE = (
+    "Evaluación de segmentadores por umbralización y crecimiento de regiones "
+    "frente a ground truth: CrackForest Dataset y escenas urbanas de La Candelaria"
+)
 REAL_IMAGES = ROOT / "data" / "real" / "images"
 REAL_MASKS = ROOT / "data" / "real" / "masks"
 CFD_ROOT = ROOT / "data" / "benchmarks" / "cfd5"
-OUTPUT = ROOT / "artifacts" / "integrated_evaluation"
+FIGURES = ROOT / "deliverables" / "figures"
 RESULTS_PATH = ROOT / "deliverables" / "results.json"
 CFD_RESULTS_PATH = ROOT / "deliverables" / "cfd_results.json"
+STEPS_IMAGE_ID = "001"
+RG_TOLERANCES = (20.0, 25.0, 30.0, 35.0, 40.0)
+WS_DISTANCES = (3.0, 5.0, 8.0)
 
 
-def fixed_cfd_input(image: np.ndarray) -> np.ndarray:
-    """Apply the approved fixed input transform equally to both segmenters."""
-    gray = np.rint(np.asarray(image, dtype=np.float64)[..., :3].mean(axis=2)).astype(np.uint8)
-    return (255 - gray).astype(np.uint8)
+def _relative(path: Path) -> str:
+    return str(path.relative_to(ROOT)).replace("\\", "/")
 
 
-def error_map(truth: np.ndarray, prediction: np.ndarray) -> np.ndarray:
-    """Render TN black, FP red, FN blue and TP green."""
-    view = np.zeros((*truth.shape, 3), dtype=np.uint8)
-    view[(prediction == 1) & (truth == 0)] = [220, 40, 40]
-    view[(prediction == 0) & (truth == 1)] = [40, 90, 220]
-    view[(prediction == 1) & (truth == 1)] = [40, 170, 70]
-    return view
-
-
-def _summarize(records: list[dict]) -> tuple[list[dict], dict, dict]:
+def _summarize(records: list[dict]) -> dict:
+    """Métricas por imagen, matrices, promedio por imagen y agregado ponderado por píxel."""
     rows: list[dict] = []
     matrices: dict[str, dict[str, list[list[int]]]] = {}
-    reference_chunks: dict[str, list[np.ndarray]] = {"Otsu": [], "K-means": []}
-    prediction_chunks: dict[str, list[np.ndarray]] = {"Otsu": [], "K-means": []}
     for record in records:
-        identifier = record["id"]
-        truth = record["truth"]
-        matrices[identifier] = {}
-        for method, prediction, parameter in record["predictions"]:
-            matrix = confusion_matrix(truth, prediction).tolist()
-            matrices[identifier][method] = matrix
+        matrices[record["id"]] = {}
+        for method in METHODS:
+            prediction = record["masks"][method]
+            matrices[record["id"]][method] = confusion_matrix(record["truth"], prediction).tolist()
             rows.append(
                 {
-                    "image": identifier,
+                    "image": record["id"],
                     "method": method,
-                    "parameter": parameter,
-                    **binary_metrics(truth, prediction),
+                    "parameter": record["parameters"][method],
+                    **binary_metrics(record["truth"], prediction),
                 }
             )
-            reference_chunks[method].append(truth.ravel())
-            prediction_chunks[method].append(prediction.ravel())
+    mean_per_image = {}
     aggregate = {}
-    for method in ("Otsu", "K-means"):
-        truth = np.concatenate(reference_chunks[method])
-        prediction = np.concatenate(prediction_chunks[method])
+    for method in METHODS:
+        method_rows = [row for row in rows if row["method"] == method]
+        mean_per_image[method] = {
+            field: float(np.mean([row[field] for row in method_rows]))
+            for field in ("iou", "dice", "precision", "recall", "accuracy")
+        }
+        truth = np.concatenate([record["truth"].ravel() for record in records])
+        prediction = np.concatenate([record["masks"][method].ravel() for record in records])
         aggregate[method] = {
             "metrics": binary_metrics(truth, prediction),
             "confusion_matrix": confusion_matrix(truth, prediction).tolist(),
         }
-    return rows, matrices, aggregate
-
-
-def _save_overview(records: list[dict], path: Path, scenario: str) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    figure, axes = plt.subplots(5, 4, figsize=(15.5, 11), dpi=180)
-    for row_index, record in enumerate(records):
-        otsu = record["predictions"][0][1]
-        kmeans = record["predictions"][1][1]
-        if scenario == "la_candelaria":
-            panels = [
-                (record["image"], "Original", None),
-                (record["truth"], "Referencia preliminar", "gray"),
-                (otsu, "Otsu", "gray"),
-                (kmeans, "K-means", "gray"),
-            ]
-        else:
-            panels = [
-                (record["image"], "Original", None),
-                (record["truth"], "Referencia oficial", "gray"),
-                (error_map(record["truth"], otsu), "Otsu: FP/FN/TP", None),
-                (error_map(record["truth"], kmeans), "K-means: FP/FN/TP", None),
-            ]
-        for column_index, (content, title, cmap) in enumerate(panels):
-            axis = axes[row_index, column_index]
-            axis.imshow(content, cmap=cmap, vmin=0 if cmap else None, vmax=1 if cmap else None)
-            if row_index == 0:
-                axis.set_title(title, fontsize=11, fontweight="bold")
-            if column_index == 0:
-                axis.set_ylabel(record["id"], fontsize=9)
-            axis.set_xticks([])
-            axis.set_yticks([])
-    heading = (
-        "La Candelaria: comparación visual (referencias preliminares)"
-        if scenario == "la_candelaria"
-        else "CrackForest: referencia oficial y errores (FP rojo, FN azul, TP verde)"
-    )
-    figure.suptitle(heading, fontsize=15, fontweight="bold")
-    figure.tight_layout(rect=[0, 0, 1, 0.965], h_pad=0.5, w_pad=0.35)
-    figure.savefig(path, dpi=180, facecolor="white", bbox_inches="tight")
-    plt.close(figure)
-
-
-def evaluate_la_candelaria(create_figures: bool = True) -> dict:
-    records: list[dict] = []
-    for image_path in sorted(REAL_IMAGES.glob("*.jpg")):
-        mask_path = REAL_MASKS / f"{image_path.stem}_mask.png"
-        if not mask_path.exists():
-            raise FileNotFoundError(mask_path)
-        image = np.asarray(Image.open(image_path).convert("RGB"))
-        truth = np.asarray(Image.open(mask_path).convert("L")) > 0
-        if image.shape[:2] != truth.shape:
-            raise ValueError(f"Dimension mismatch for {image_path.name}")
-        threshold, otsu = otsu_threshold(image)
-        centroids, kmeans = kmeans_segment(image, seed=7)
-        records.append(
-            {
-                "id": image_path.stem,
-                "image": image,
-                "truth": truth,
-                "predictions": [
-                    ("Otsu", otsu, f"threshold={threshold}; RGB mean; bins=256"),
-                    (
-                        "K-means",
-                        kmeans,
-                        "k=2; seed=7; max_iter=100; tolerance=1e-4; "
-                        f"centroids={np.round(centroids, 2).tolist()}; RGB mean",
-                    ),
-                ],
-            }
-        )
-    rows, matrices, aggregate = _summarize(records)
-    figure_path = OUTPUT / "la_candelaria_overview.png"
-    if create_figures:
-        _save_overview(records, figure_path, "la_candelaria")
     return {
-        "id": "la_candelaria",
-        "role": "main case study",
-        "status": "exploratory; manual references are preliminary and failed complete visual validation",
-        "reference_type": "Independent manual polygon masks for urban_built_surface; not validated ground truth.",
-        "preprocessing": "Existing implementations convert RGB to the arithmetic mean of R, G and B; no image-specific tuning.",
         "rows": rows,
         "confusion_matrices": matrices,
+        "mean_per_image": mean_per_image,
         "aggregate_pixel_weighted": aggregate,
-        "overview_figure": str(figure_path.relative_to(ROOT)).replace("\\", "/"),
     }
 
 
-def evaluate_cfd(create_figures: bool = True) -> dict:
+def _save(figure, path: Path) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    figure.savefig(path, dpi=figure.dpi, facecolor="white", bbox_inches="tight")
+    plt.close(figure)
+
+
+def load_cfd() -> list[dict]:
+    """Carga las parejas imagen/ground truth del manifiesto CFD."""
     manifest_path = CFD_ROOT / "manifest.json"
     if not manifest_path.exists():
-        raise FileNotFoundError("Run scripts/prepare_cfd_benchmark.py --prepare first.")
+        raise FileNotFoundError("Ejecute primero scripts/prepare_cfd_benchmark.py --prepare.")
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    records: list[dict] = []
+    pairs = []
     for item in manifest["files"]:
         image = np.asarray(Image.open(ROOT / item["image"]).convert("RGB"))
         truth = np.asarray(Image.open(ROOT / item["binary_reference"]).convert("L")) > 0
-        transformed = fixed_cfd_input(image)
-        threshold, otsu = otsu_threshold(transformed)
-        centroids, kmeans = kmeans_segment(transformed, seed=7)
-        records.append(
+        pairs.append({"id": item["id"], "image": image, "truth": truth})
+    return pairs
+
+
+def load_candelaria() -> list[dict]:
+    """Carga las cinco fotografías y sus referencias manuales preliminares."""
+    pairs = []
+    for image_path in sorted(REAL_IMAGES.glob("*.jpg")):
+        mask_path = REAL_MASKS / f"{image_path.stem}_mask.png"
+        image = np.asarray(Image.open(image_path).convert("RGB"))
+        truth = np.asarray(Image.open(mask_path).convert("L")) > 0
+        if image.shape[:2] != truth.shape:
+            raise ValueError(f"Dimensiones distintas en {image_path.name}")
+        pairs.append({"id": image_path.stem, "image": image, "truth": truth})
+    return pairs
+
+
+def cfd_sensitivity(pairs: list[dict]) -> dict:
+    """Dice/IoU medios al variar la tolerancia de RG y la distancia de fondo de Watershed."""
+    inputs = [(preprocess_cfd(pair["image"])["input"], pair["truth"]) for pair in pairs]
+    region = []
+    for tolerance in RG_TOLERANCES:
+        scores = [
+            binary_metrics(truth, region_growing(x, select_seeds(x, CFD_PARAMS["rg_seed_percentile"]), tolerance)[0])
+            for x, truth in inputs
+        ]
+        region.append(
             {
-                "id": item["id"],
-                "image": image,
-                "truth": truth,
-                "predictions": [
-                    ("Otsu", otsu, f"threshold={threshold}; input=255-gray; bins=256"),
-                    (
-                        "K-means",
-                        kmeans,
-                        "k=2; seed=7; max_iter=100; tolerance=1e-4; "
-                        f"centroids={np.round(centroids, 2).tolist()}; input=255-gray",
-                    ),
-                ],
+                "tolerance": tolerance,
+                "mean_dice": float(np.mean([s["dice"] for s in scores])),
+                "mean_iou": float(np.mean([s["iou"] for s in scores])),
+                "mean_recall": float(np.mean([s["recall"] for s in scores])),
+                "mean_precision": float(np.mean([s["precision"] for s in scores])),
             }
         )
-    rows, matrices, aggregate = _summarize(records)
-    figure_path = OUTPUT / "cfd_overview.png"
+    watershed = []
+    for distance in WS_DISTANCES:
+        scores = []
+        for x, truth in inputs:
+            threshold, _ = otsu_threshold(x)
+            markers, _ = build_markers(x, threshold, CFD_PARAMS["ws_seed_percentile"], distance)
+            labels, _ = marker_watershed(sobel_magnitude(x), markers)
+            scores.append(binary_metrics(truth, labels == FOREGROUND))
+        watershed.append(
+            {
+                "background_distance": distance,
+                "mean_dice": float(np.mean([s["dice"] for s in scores])),
+                "mean_iou": float(np.mean([s["iou"] for s in scores])),
+                "mean_recall": float(np.mean([s["recall"] for s in scores])),
+                "mean_precision": float(np.mean([s["precision"] for s in scores])),
+            }
+        )
+    return {"region_growing_tolerance": region, "watershed_background_distance": watershed}
+
+
+def evaluate_cfd(create_figures: bool = True) -> dict:
+    records = []
+    for pair in load_cfd():
+        steps = preprocess_cfd(pair["image"])
+        outputs = run_methods(steps["input"], CFD_PARAMS)
+        records.append(
+            {
+                **pair,
+                "masks": {method: outputs[method]["mask"] for method in METHODS},
+                "parameters": {method: outputs[method]["parameter"] for method in METHODS},
+                "steps": steps,
+                "outputs": outputs,
+            }
+        )
+    overview_path = FIGURES / "cfd_overview.png"
+    steps_path = FIGURES / "cfd_pasos.png"
     if create_figures:
-        _save_overview(records, figure_path, "cfd")
+        _save(
+            visualization.overview_figure(records, "CrackForest: ground truth y errores (FP rojo, FN azul, TP verde)"),
+            overview_path,
+        )
+        chosen = next(record for record in records if record["id"] == STEPS_IMAGE_ID)
+        _save(
+            visualization.steps_figure(chosen["steps"], chosen["outputs"], chosen["truth"], STEPS_IMAGE_ID),
+            steps_path,
+        )
     return {
         "id": "cfd5",
-        "role": "complementary benchmark",
-        "status": "official references; five selected pairs passed technical alignment and polarity review",
-        "benchmark_manifest": str(manifest_path.relative_to(ROOT)).replace("\\", "/"),
-        "reference_type": "Official CrackForest groundTruth.Segmentation; label 2 is crack/foreground.",
-        "preprocessing": "gray = round(mean(R,G,B)); both methods receive 255 - gray; no per-image tuning.",
-        "rows": rows,
-        "confusion_matrices": matrices,
-        "aggregate_pixel_weighted": aggregate,
-        "overview_figure": str(figure_path.relative_to(ROOT)).replace("\\", "/"),
+        "role": "evaluación cuantitativa principal",
+        "benchmark_manifest": "data/benchmarks/cfd5/manifest.json",
+        "reference_type": "Anotación oficial CrackForest groundTruth.Segmentation; etiqueta 2 = grieta (objeto).",
+        "preprocessing": "gris = media RGB; suavizado gaussiano sigma=1.5; inversión 255-I; resta de fondo "
+        "I' = 4*(I - G15*I) + 128; la misma entrada para los cuatro métodos.",
+        "parameters": CFD_PARAMS,
+        **_summarize(records),
+        "sensitivity": cfd_sensitivity(records),
+        "overview_figure": _relative(overview_path),
+        "steps_figure": _relative(steps_path),
+    }
+
+
+def evaluate_la_candelaria(create_figures: bool = True) -> dict:
+    records = []
+    for pair in load_candelaria():
+        steps = preprocess_candelaria(pair["image"])
+        outputs = run_methods(steps["input"], CANDELARIA_PARAMS)
+        shape = pair["truth"].shape
+        records.append(
+            {
+                **pair,
+                "masks": {method: upscale_mask(outputs[method]["mask"], shape) for method in METHODS},
+                "parameters": {method: outputs[method]["parameter"] for method in METHODS},
+            }
+        )
+    overview_path = FIGURES / "la_candelaria_overview.png"
+    if create_figures:
+        preview = []
+        for record in records:
+            image = Image.fromarray(record["image"])
+            scale = 480 / max(image.size)
+            size = (round(image.size[0] * scale), round(image.size[1] * scale))
+            preview.append({
+                "id": record["id"],
+                "image": np.asarray(image.resize(size, Image.BILINEAR)),
+                "truth": np.asarray(Image.fromarray(record["truth"]).resize(size, Image.NEAREST)),
+                "masks": {
+                    method: np.asarray(Image.fromarray(record["masks"][method]).resize(size, Image.NEAREST))
+                    for method in METHODS
+                },
+            })
+        _save(
+            visualization.overview_figure(
+                preview, "La Candelaria: referencia manual preliminar y errores (FP rojo, FN azul, TP verde)"
+            ),
+            overview_path,
+        )
+    return {
+        "id": "la_candelaria",
+        "role": "aplicación secundaria con métricas orientativas",
+        "reference_type": "Máscaras manuales propias de urban_built_surface (fachadas, cubiertas y pavimento), "
+        "elaboradas sin usar los segmentadores; no son una anotación experta validada.",
+        "preprocessing": "reducción a lado máximo 1024 px; gris = media RGB; suavizado gaussiano sigma=1.5; "
+        "las máscaras se reescalan por vecino más cercano a la resolución original antes de evaluar.",
+        "parameters": CANDELARIA_PARAMS,
+        **_summarize(records),
+        "overview_figure": _relative(overview_path),
     }
 
 
 def evaluate_all(write_outputs: bool = True, create_figures: bool = True) -> dict:
     result = {
-        "schema": "integrated-segmentation-evaluation-v1",
-        "generated_on": date.today().isoformat(),
-        "title": "Evaluación de métodos de segmentación en imágenes urbanas de La Candelaria, Bogotá, con validación complementaria mediante CrackForest Dataset",
+        "schema": "segmentation-evaluation-v2",
+        "title": TITLE,
         "algorithms": {
-            "Otsu": "256-bin global threshold; foreground is intensity > threshold.",
-            "K-means": "Own 1-D k=2 implementation; min/max initialization, seed 7, max_iter 100, tolerance 1e-4; brighter cluster is foreground.",
-            "metrics": "IoU, Dice, precision, recall and accuracy; confusion matrices use [[TN, FP], [FN, TP]].",
+            "Otsu": "Línea base: umbral global que maximiza la varianza entre clases (histograma de 256 niveles).",
+            "K-means": "Línea base: K-means 1-D propio, k=2, inicialización mín./máx., semilla 7; grupo claro = objeto.",
+            "Region Growing": "Crecimiento de regiones por semillas (Tema 10.4), propio: semillas por percentil, "
+            "vecindad 8, criterio |I(p) - media de la región| <= T.",
+            "Watershed": "Watershed con marcadores (Tema 10.7), inundación propia por cola de prioridad sobre el "
+            "gradiente de Sobel; marcadores de fondo por mapa de distancias.",
+            "metrics": "Evaluador propio: IoU, Dice, precisión, recall y exactitud; matrices [[TN, FP], [FN, TP]].",
         },
-        "case_study": evaluate_la_candelaria(create_figures=create_figures),
-        "complementary_benchmark": evaluate_cfd(create_figures=create_figures),
-        "quality_gates": {
-            "cfd_pair_integrity": "passed",
-            "cfd_visual_alignment_and_polarity": "passed by technical visual inspection of five review sheets",
-            "la_candelaria_reference_validation": "pending; preliminary masks contain known visual errors",
-            "qg1": "not approved",
-        },
+        "cfd": evaluate_cfd(create_figures=create_figures),
+        "la_candelaria": evaluate_la_candelaria(create_figures=create_figures),
     }
     if write_outputs:
         RESULTS_PATH.parent.mkdir(parents=True, exist_ok=True)
-        encoded = json.dumps(result, indent=2, ensure_ascii=False)
-        RESULTS_PATH.write_text(encoded + "\n", encoding="utf-8")
-        cfd = result["complementary_benchmark"]
-        CFD_RESULTS_PATH.write_text(json.dumps(cfd, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+        RESULTS_PATH.write_text(json.dumps(result, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+        CFD_RESULTS_PATH.write_text(json.dumps(result["cfd"], indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     return result
 
 
 def main() -> None:
+    plt.switch_backend("Agg")
     result = evaluate_all(write_outputs=True, create_figures=True)
-    print(f"La Candelaria rows={len(result['case_study']['rows'])}")
-    print(f"CFD rows={len(result['complementary_benchmark']['rows'])}")
+    for scenario in ("cfd", "la_candelaria"):
+        print(scenario)
+        for method, metrics in result[scenario]["mean_per_image"].items():
+            print(f"  {method:15s} IoU={metrics['iou']:.4f} Dice={metrics['dice']:.4f}")
     print(f"results={RESULTS_PATH}")
 
 
