@@ -4,7 +4,7 @@
 
 **Trabajo: Evaluación de la segmentación**
 
-**Integrantes:** Mateo Torres Arredondo; Edna Mayerli Alvarez; Manuel Alejandro Murcia
+**Integrantes:** Mateo Torres Arredondo; Edna Mayerly Alvarez; Manuel Alejandro Murcia
 
 **Profesor:** Luis Fernando Barajas Ardila  
 **Fecha:** 18/10/2026

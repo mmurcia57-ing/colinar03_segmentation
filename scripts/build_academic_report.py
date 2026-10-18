@@ -29,7 +29,7 @@ pdfmetrics.registerFontFamily("DejaVu", normal="DejaVu", bold="DejaVu-Bold", ita
 
 COURSE = "Percepción Computacional (COEINTAR) - Enero 2026 - PER 15708"
 ASSIGNMENT = "Trabajo: Evaluación de la segmentación"
-AUTHORS = (("Torres Arredondo", "Mateo"), ("Alvarez", "Edna Mayerli"), ("Murcia", "Manuel Alejandro"))
+AUTHORS = (("Torres Arredondo", "Mateo"), ("Alvarez", "Edna Mayerly"), ("Murcia", "Manuel Alejandro"))
 PROFESSOR = "Luis Fernando Barajas Ardila"
 DATE = "18/10/2026"
 
